@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Rerender Results - Pastebin{% endblock %}
+
+{% block content %}
+<header>
+    <h1>Rerender Results</h1>
+    <div class="header-actions">
+        <a href="{{ basePath }}/" class="button">Back to Home</a>
+    </div>
+</header>
+
+<p>Re-rendered {{ results|length }} paste(s):</p>
+
+<ul class="paste-list">
+    {% for result in results %}
+    <li class="paste-item">
+        <div class="paste-info">
+            <div class="paste-title">
+                {{ result.title }}
+            </div>
+            <div class="paste-meta">
+                {% if result.success %}
+                    <span style="color: green;">✓ Success</span>
+                {% else %}
+                    <span style="color: red;">✗ Failed: {{ result.error }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+{% endblock %}

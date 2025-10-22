@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}500 Server Error - Pastebin{% endblock %}
+
+{% block content %}
+<header>
+    <h1>500 - Server Error</h1>
+</header>
+
+<p class="not-found-message">Something went wrong processing your request.</p>
+
+<p><a href="{{ basePath }}/">Go back home</a></p>
+{% endblock %}

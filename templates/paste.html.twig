@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ meta.title }} - Pastebin{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+{% endblock %}
+
+{% block content %}
+<header>
+    <div>
+        <h1>{% if not meta.public %}🔒 {% endif %}{{ meta.title }}</h1>
+    </div>
+    <div class="nav">
+        <a href="{{ basePath }}/" class="button">Home</a>
+        {% if isLoggedIn %}
+            <a href="{{ basePath }}/notes/{{ paste.getId() }}/edit" class="button secondary">Edit</a>
+        {% endif %}
+    </div>
+</header>
+
+{% if meta.description %}
+<div class="description">
+    {{ meta.description }}
+</div>
+{% endif %}
+
+{% for file in files %}
+<div class="file-section">
+    <div class="file-header">
+        <h2>{{ file.filename }}</h2>
+        <div class="file-meta">
+            {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link'] %}
+                Type: {{ file.meta.type }}
+                {% if file.meta.render not in ['link', 'file-link'] %} | {% endif %}
+            {% endif %}
+            {% if file.meta.render not in ['link', 'file-link'] %}
+                <a href="./files/{{ file.filename|url_encode }}">Download</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if file.meta.description %}
+    <p class="file-description">{{ file.meta.description }}</p>
+    {% endif %}
+
+    <div class="file-content">
+        {{ file.renderedContent|raw }}
+    </div>
+</div>
+{% endfor %}
+
+<footer>
+    {% if meta.author %}
+        by {{ meta.author }} |
+    {% endif %}
+    Created: {{ meta.createdAt|date('Y-m-d H:i:s') }}
+    {% if meta.updatedAt and meta.updatedAt != meta.createdAt %}
+        | Updated: {{ meta.updatedAt|date('Y-m-d H:i:s') }}
+    {% endif %}
+</footer>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('pre code').forEach(function(block) {
+            hljs.highlightElement(block);
+        });
+    });
+</script>
+{% endblock %}

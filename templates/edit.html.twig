@@ -1,0 +1,279 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% if isNew %}New Paste{% else %}Edit: {{ meta.title }}{% endif %} - Pastebin{% endblock %}
+
+{% block content %}
+<header>
+    <h1>{% if isNew %}New Paste{% else %}Edit Paste{% endif %}</h1>
+    <div class="nav">
+        <a href="{{ basePath }}/" class="button secondary">Home</a>
+        {% if not isNew %}
+            <a href="{{ paste.getHtmlUrl() }}" class="button secondary">View</a>
+        {% endif %}
+        <a href="{{ basePath }}/logout" class="button secondary">Logout</a>
+    </div>
+</header>
+
+<form method="post" enctype="multipart/form-data" id="paste-form">
+    <div class="form-group">
+        <label for="title">Title</label>
+        <input type="text" id="title" name="title" value="{{ meta.title }}" required>
+    </div>
+
+    <div class="form-group">
+        <label for="summary">Summary (shown in paste list)</label>
+        <input type="text" id="summary" name="summary" value="{{ meta.summary }}">
+    </div>
+
+    <div class="form-group">
+        <label for="description">Description</label>
+        <textarea id="description" name="description" rows="3">{{ meta.description }}</textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="author">Author</label>
+        <input type="text" id="author" name="author" value="{{ meta.author }}">
+    </div>
+
+    <div class="form-group">
+        <div class="checkbox-field">
+            <input type="checkbox" id="public" name="public" value="1" {% if meta.public %}checked{% endif %}>
+            <label for="public">Public (visible to everyone)</label>
+        </div>
+    </div>
+
+    <h2>Files</h2>
+
+    <div id="files-container">
+        {% if meta.files %}
+            {% for filename, fileMeta in meta.files %}
+            <div class="file-editor" data-file-index="{{ loop.index0 }}">
+                <div class="file-editor-header">
+                    <h3>File #{{ loop.index }}</h3>
+                    <button type="button" class="secondary" onclick="removeFile(this)">Remove</button>
+                </div>
+
+                <div class="inline-fields">
+                    <div class="form-group">
+                        <label>Filename</label>
+                        <input type="text" name="files[{{ loop.index0 }}][filename]" value="{{ filename }}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Render Mode</label>
+                        <select name="files[{{ loop.index0 }}][render]" class="render-select" onchange="updateFileFields(this)">
+                            <option value="plain" {% if fileMeta.render == 'plain' %}selected{% endif %}>Plain</option>
+                            <option value="highlighted" {% if fileMeta.render == 'highlighted' %}selected{% endif %}>Highlighted</option>
+                            <option value="rendered" {% if fileMeta.render == 'rendered' %}selected{% endif %}>Rendered</option>
+                            <option value="image" {% if fileMeta.render == 'image' %}selected{% endif %}>Image</option>
+                            <option value="file" {% if fileMeta.render == 'file' %}selected{% endif %}>File Download</option>
+                            <option value="file-link" {% if fileMeta.render == 'file-link' %}selected{% endif %}>File Link</option>
+                            <option value="link" {% if fileMeta.render == 'link' %}selected{% endif %}>List of Links</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group file-type-field">
+                        <label>Type</label>
+                        <select name="files[{{ loop.index0 }}][type]" class="type-select">
+                            <option value="">Auto-detect</option>
+                            <option value="bash" {% if fileMeta.type == 'bash' %}selected{% endif %}>Bash</option>
+                            <option value="c" {% if fileMeta.type == 'c' %}selected{% endif %}>C</option>
+                            <option value="cpp" {% if fileMeta.type == 'cpp' %}selected{% endif %}>C++</option>
+                            <option value="csharp" {% if fileMeta.type == 'csharp' %}selected{% endif %}>C#</option>
+                            <option value="css" {% if fileMeta.type == 'css' %}selected{% endif %}>CSS</option>
+                            <option value="diff" {% if fileMeta.type == 'diff' %}selected{% endif %}>Diff</option>
+                            <option value="go" {% if fileMeta.type == 'go' %}selected{% endif %}>Go</option>
+                            <option value="html" {% if fileMeta.type == 'html' %}selected{% endif %}>HTML</option>
+                            <option value="java" {% if fileMeta.type == 'java' %}selected{% endif %}>Java</option>
+                            <option value="javascript" {% if fileMeta.type == 'javascript' %}selected{% endif %}>JavaScript</option>
+                            <option value="json" {% if fileMeta.type == 'json' %}selected{% endif %}>JSON</option>
+                            <option value="kotlin" {% if fileMeta.type == 'kotlin' %}selected{% endif %}>Kotlin</option>
+                            <option value="markdown" {% if fileMeta.type == 'markdown' %}selected{% endif %}>Markdown</option>
+                            <option value="php" {% if fileMeta.type == 'php' %}selected{% endif %}>PHP</option>
+                            <option value="python" {% if fileMeta.type == 'python' %}selected{% endif %}>Python</option>
+                            <option value="ruby" {% if fileMeta.type == 'ruby' %}selected{% endif %}>Ruby</option>
+                            <option value="rust" {% if fileMeta.type == 'rust' %}selected{% endif %}>Rust</option>
+                            <option value="sql" {% if fileMeta.type == 'sql' %}selected{% endif %}>SQL</option>
+                            <option value="swift" {% if fileMeta.type == 'swift' %}selected{% endif %}>Swift</option>
+                            <option value="typescript" {% if fileMeta.type == 'typescript' %}selected{% endif %}>TypeScript</option>
+                            <option value="xml" {% if fileMeta.type == 'xml' %}selected{% endif %}>XML</option>
+                            <option value="yaml" {% if fileMeta.type == 'yaml' %}selected{% endif %}>YAML</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" name="files[{{ loop.index0 }}][description]" value="{{ fileMeta.description }}">
+                </div>
+
+                <div class="form-group file-content-field">
+                    <label>Content (or upload file below)</label>
+                    <textarea name="files[{{ loop.index0 }}][content]" rows="10">{% if fileMeta.render not in ['image', 'file', 'file-link'] %}{{ paste.getFile(filename) }}{% endif %}</textarea>
+                </div>
+
+                <div class="form-group file-exists-indicator" style="display: none;">
+                    <label>Current File</label>
+                    <div class="existing-file-info">
+                        <strong>{{ filename }}</strong> exists
+                        {% if fileMeta.render == 'image' %}
+                        <div style="margin-top: 10px;">
+                            <img src="{{ basePath }}/notes/{{ paste.id }}/files/{{ filename }}" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Upload {% if fileMeta.render in ['image', 'file', 'file-link'] %}New {% endif %}File</label>
+                    <input type="file" name="file_uploads[{{ loop.index0 }}]">
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <button type="button" onclick="addFile()" class="secondary">Add File</button>
+
+    <div class="button-group">
+        <button type="submit">Save Paste</button>
+        {% if not isNew %}
+            <a href="{{ paste.getHtmlUrl() }}" class="button secondary">Cancel</a>
+        {% endif %}
+    </div>
+</form>
+
+<script>
+let fileIndex = {{ meta.files|length }};
+
+function addFile() {
+    const container = document.getElementById('files-container');
+    const fileEditor = document.createElement('div');
+    fileEditor.className = 'file-editor';
+    fileEditor.setAttribute('data-file-index', fileIndex);
+
+    fileEditor.innerHTML = `
+        <div class="file-editor-header">
+            <h3>File #${fileIndex + 1}</h3>
+            <button type="button" class="secondary" onclick="removeFile(this)">Remove</button>
+        </div>
+
+        <div class="inline-fields">
+            <div class="form-group">
+                <label>Filename</label>
+                <input type="text" name="files[${fileIndex}][filename]" required>
+            </div>
+
+            <div class="form-group">
+                <label>Render Mode</label>
+                <select name="files[${fileIndex}][render]" class="render-select" onchange="updateFileFields(this)">
+                    <option value="plain">Plain</option>
+                    <option value="highlighted" selected>Highlighted</option>
+                    <option value="rendered">Rendered</option>
+                    <option value="image">Image</option>
+                    <option value="file">File Download</option>
+                    <option value="file-link">File Link</option>
+                    <option value="link">List of Links</option>
+                </select>
+            </div>
+
+            <div class="form-group file-type-field">
+                <label>Type</label>
+                <select name="files[${fileIndex}][type]" class="type-select">
+                    <option value="">Auto-detect</option>
+                    <option value="bash">Bash</option>
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="csharp">C#</option>
+                    <option value="css">CSS</option>
+                    <option value="diff">Diff</option>
+                    <option value="go">Go</option>
+                    <option value="html">HTML</option>
+                    <option value="java">Java</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="json">JSON</option>
+                    <option value="kotlin">Kotlin</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="php">PHP</option>
+                    <option value="python">Python</option>
+                    <option value="ruby">Ruby</option>
+                    <option value="rust">Rust</option>
+                    <option value="sql">SQL</option>
+                    <option value="swift">Swift</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="xml">XML</option>
+                    <option value="yaml">YAML</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" name="files[${fileIndex}][description]">
+        </div>
+
+        <div class="form-group file-content-field">
+            <label>Content (or upload file below)</label>
+            <textarea name="files[${fileIndex}][content]" rows="10"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Or Upload File</label>
+            <input type="file" name="file_uploads[${fileIndex}]">
+        </div>
+    `;
+
+    container.appendChild(fileEditor);
+
+    // Initialize field visibility for new file
+    const renderSelect = fileEditor.querySelector('.render-select');
+    updateFileFields(renderSelect);
+
+    fileIndex++;
+}
+
+function removeFile(button) {
+    button.closest('.file-editor').remove();
+}
+
+function updateFileFields(renderSelect) {
+    const fileEditor = renderSelect.closest('.file-editor');
+    const renderMode = renderSelect.value;
+    const typeField = fileEditor.querySelector('.file-type-field');
+    const contentField = fileEditor.querySelector('.file-content-field');
+    const fileExistsIndicator = fileEditor.querySelector('.file-exists-indicator');
+    const typeSelect = fileEditor.querySelector('.type-select');
+
+    // Hide type for image/file/file-link/link modes
+    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link') {
+        typeField.style.display = 'none';
+        // Set type to match render mode
+        typeSelect.value = renderMode;
+    } else {
+        typeField.style.display = '';
+    }
+
+    // Hide content for image/file/file-link modes (but not link - that needs content)
+    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link') {
+        contentField.style.display = 'none';
+        // Show file exists indicator if it exists (only for existing files)
+        if (fileExistsIndicator) {
+            fileExistsIndicator.style.display = '';
+        }
+    } else {
+        contentField.style.display = '';
+        // Hide file exists indicator
+        if (fileExistsIndicator) {
+            fileExistsIndicator.style.display = 'none';
+        }
+    }
+}
+
+// Initialize field visibility on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.render-select').forEach(function(select) {
+        updateFileFields(select);
+    });
+});
+</script>
+{% endblock %}

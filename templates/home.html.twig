@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% if isLoggedIn %}My Pastes{% else %}Public Pastes{% endif %} - Pastebin{% endblock %}
+
+{% block content %}
+<header>
+    <h1>{% if isLoggedIn %}My Pastes{% else %}Public Pastes{% endif %}</h1>
+    <div class="header-actions">
+        {% if isLoggedIn %}
+            <a href="{{ basePath }}/notes/new" class="button">New Paste</a>
+            <form method="post" action="{{ basePath }}/notes/rerender-all" style="display: inline;">
+                <button type="submit" class="button secondary">Rerender All</button>
+            </form>
+            <a href="{{ basePath }}/logout" class="button secondary">Logout</a>
+        {% else %}
+            <a href="{{ basePath }}/login" class="button">Login</a>
+        {% endif %}
+    </div>
+</header>
+
+{% if pastes|length > 0 %}
+    <ul class="paste-list">
+        {% for pasteData in pastes %}
+        <li class="paste-item">
+            <div class="paste-info">
+                <div class="paste-title">
+                    <a href="{{ pasteData.paste.getHtmlUrl() }}">
+                        {% if not pasteData.public %}🔒 {% endif %}{{ pasteData.title }}
+                    </a>
+                </div>
+                {% if pasteData.summary %}
+                    <div class="paste-summary">{{ pasteData.summary }}</div>
+                {% endif %}
+                <div class="paste-meta">
+                    by {{ pasteData.author }}
+                    {% if pasteData.updatedAt %}
+                        | Updated {{ pasteData.updatedAt|date('Y-m-d H:i') }}
+                    {% elseif pasteData.createdAt %}
+                        | Created {{ pasteData.createdAt|date('Y-m-d H:i') }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="paste-actions">
+                <a href="{{ pasteData.paste.getHtmlUrl() }}" class="button">View</a>
+                {% if isLoggedIn %}
+                    <a href="{{ basePath }}/notes/{{ pasteData.id }}/edit" class="button secondary">Edit</a>
+                    <form method="post" action="{{ basePath }}/notes/{{ pasteData.id }}/rerender">
+                        <button type="submit" class="button secondary">Rerender</button>
+                    </form>
+                {% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div class="empty-state">
+        <h2>No pastes yet</h2>
+        {% if isLoggedIn %}
+            <p>Create your first paste to get started!</p>
+            <p class="empty-state-cta">
+                <a href="{{ basePath }}/notes/new" class="button">Create New Paste</a>
+            </p>
+        {% else %}
+            <p>No public pastes available.</p>
+        {% endif %}
+    </div>
+{% endif %}
+{% endblock %}

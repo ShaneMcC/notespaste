@@ -1,0 +1,25 @@
+RewriteEngine On
+
+# Disable directory indexes globally
+Options -Indexes
+
+# Prevent access to _meta.json files
+RewriteRule ^notes/.*/_meta\.json$ - [F,L]
+
+# Allow direct access to files in notes/*/files/ directories (must be actual files)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} ^/notes/[^/]+/files/
+RewriteRule ^ - [L]
+
+# Allow access to rendered HTML files
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteCond %{REQUEST_URI} \.html$
+RewriteRule ^ - [L]
+
+# Allow access to static assets (css, js, images in public folders)
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^(static|assets|public)/ - [L]
+
+# Route everything else through index.php (including directory access attempts)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^ index.php [QSA,L]
