@@ -335,6 +335,9 @@ function addFile() {
     const renderSelect = fileEditor.querySelector('.render-select');
     updateFileFields(renderSelect);
 
+    // Setup drag and drop for new file editor
+    setupDragAndDrop(fileEditor);
+
     // Update display file dropdown to include new file
     updateDisplayFileDropdown();
 
@@ -378,19 +381,21 @@ function updateFileFields(renderSelect) {
     }
 
     // Hide content for image/file/file-link modes (but not link - that needs content)
-    // However, if there's content in the textarea (text file), show it anyway
+    // However, always show content field if there's no existing file (new file being created)
     if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link') {
         const textarea = contentField.querySelector('textarea');
         const hasContent = textarea && textarea.value.trim().length > 0;
+        const hasExistingFile = fileExistsIndicator && !fileExistsIndicator.classList.contains('hidden');
 
-        if (hasContent) {
-            // Text file - show content field, hide indicator
+        // Show content field if: it has text content OR there's no existing file (new file)
+        if (hasContent || !hasExistingFile) {
+            // Show content field
             contentField.classList.remove('hidden');
             if (fileExistsIndicator) {
                 fileExistsIndicator.classList.add('hidden');
             }
         } else {
-            // Binary file or no existing file - hide content, show indicator
+            // Binary file exists - hide content, show indicator
             contentField.classList.add('hidden');
             if (fileExistsIndicator) {
                 fileExistsIndicator.classList.remove('hidden');
@@ -581,12 +586,64 @@ function updateDisplayFileDropdown() {
     }
 }
 
+// Drag and drop file upload support
+function setupDragAndDrop(fileEditor) {
+    const dropZone = fileEditor.querySelector('.file-editor-body');
+    const fileInput = fileEditor.querySelector('input[type="file"]');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('drag-over');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('drag-over');
+    }
+
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        if (files.length > 0) {
+            // Set the file input to the dropped file
+            fileInput.files = files;
+
+            // Trigger change event to show file name
+            const event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
+        }
+    }
+}
+
 // Initialize field visibility on page load
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.render-select').forEach(function(select) {
         updateFileFields(select);
     });
     updateDisplayModeFields();
+
+    // Setup drag and drop for all file editors
+    document.querySelectorAll('.file-editor').forEach(function(fileEditor) {
+        setupDragAndDrop(fileEditor);
+    });
 });
 </script>
 {% endblock %}

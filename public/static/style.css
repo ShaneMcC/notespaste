@@ -484,6 +484,12 @@ footer {
     transition: opacity 0.2s;
 }
 
+.file-editor-body.drag-over {
+    background: var(--bg-hover);
+    border: 2px dashed var(--link-color);
+    border-radius: 4px;
+}
+
 .file-hidden-indicator {
     color: var(--text-muted);
     font-size: 0.85em;
