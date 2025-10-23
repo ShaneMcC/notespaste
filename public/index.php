@@ -210,8 +210,9 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
         // Track existing files to determine what to remove
         $existingFiles = array_keys($paste->getFiles());
         $keptFiles = [];
+        $newFilesOrder = [];
 
-        // Handle file updates
+        // Handle file updates - build new ordered array
         if (isset($_POST['files'])) {
             foreach ($_POST['files'] as $index => $fileData) {
                 $filename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
@@ -255,6 +256,9 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
                 } else {
                     $paste->addFile($filename, $content ?? '', $fileMeta);
                 }
+
+                // Store in new order
+                $newFilesOrder[] = $filename;
             }
         }
 
@@ -264,6 +268,9 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
                 $paste->removeFile($existingFile);
             }
         }
+
+        // Reorder files in metadata to match form submission order
+        $paste->reorderFiles($newFilesOrder);
 
         // Re-render the paste
         $paste->render();

@@ -106,21 +106,15 @@
     function toggleFileSection(header) {
         const section = header.closest('.file-section');
         const icon = section.querySelector('.collapse-icon');
-        const body = section.querySelector('.file-body');
-        const collapsedDesc = section.querySelector('.file-collapsed-description');
 
         if (section.classList.contains('collapsed')) {
             // Expand
             section.classList.remove('collapsed');
             icon.textContent = '▼';
-            if (body) body.style.display = '';
-            if (collapsedDesc) collapsedDesc.style.display = 'none';
         } else {
             // Collapse
             section.classList.add('collapsed');
             icon.textContent = '►︎';
-            if (body) body.style.display = 'none';
-            if (collapsedDesc) collapsedDesc.style.display = '';
         }
     }
 </script>

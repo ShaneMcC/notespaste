@@ -70,9 +70,10 @@
     <div id="files-container">
         {% if meta.files %}
             {% for filename, fileMeta in meta.files %}
-            <div class="file-editor{% if meta.files|length > 1 %} collapsed{% endif %}" data-file-index="{{ loop.index0 }}">
+            <div class="file-editor{% if meta.files|length > 1 %} collapsed{% endif %}" data-file-index="{{ loop.index0 }}" draggable="true" ondragstart="handleDragStart(event)" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragend="handleDragEnd(event)">
                 <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
                     <div class="file-editor-header-left">
+                        <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
                         <span class="collapse-icon">{% if meta.files|length > 1 %}►︎{% else %}▼{% endif %}</span>
                         <h3>File #{{ loop.index }}</h3>
                         <span class="file-editor-names">{% if meta.files|length > 1 %} - {{ filename }}{% if fileMeta.displayName %} ({{ fileMeta.displayName }}){% endif %}{% if fileMeta.hidden %} <span class="file-hidden-indicator">[Hidden]</span>{% endif %}{% endif %}</span>
@@ -80,11 +81,11 @@
                     <button type="button" class="secondary" onclick="event.stopPropagation(); removeFile(this)">Remove</button>
                 </div>
 
-                <div class="file-editor-body"{% if meta.files|length > 1 %} style="display: none;"{% endif %}>
+                <div class="file-editor-body">
                 <div class="inline-fields">
                     <div class="form-group">
                         <label>Filename</label>
-                        <input type="text" name="files[{{ loop.index0 }}][filename]" value="{{ filename }}" required>
+                        <input type="text" name="files[{{ loop.index0 }}][filename]" value="{{ filename }}" required oninput="updateDisplayFileDropdown()">
                     </div>
 
                     <div class="form-group">
@@ -132,7 +133,7 @@
 
                 <div class="form-group">
                     <label for="files[{{ loop.index0 }}][displayName]">Display Name (optional)</label>
-                    <input type="text" id="files[{{ loop.index0 }}][displayName]" name="files[{{ loop.index0 }}][displayName]" value="{{ fileMeta.displayName }}" placeholder="Leave empty to use filename">
+                    <input type="text" id="files[{{ loop.index0 }}][displayName]" name="files[{{ loop.index0 }}][displayName]" value="{{ fileMeta.displayName }}" placeholder="Leave empty to use filename" oninput="updateDisplayFileDropdown()">
                 </div>
 
                 <div class="form-group">
@@ -205,10 +206,16 @@ function addFile() {
     const fileEditor = document.createElement('div');
     fileEditor.className = 'file-editor';
     fileEditor.setAttribute('data-file-index', fileIndex);
+    fileEditor.setAttribute('draggable', 'true');
+    fileEditor.setAttribute('ondragstart', 'handleDragStart(event)');
+    fileEditor.setAttribute('ondragover', 'handleDragOver(event)');
+    fileEditor.setAttribute('ondrop', 'handleDrop(event)');
+    fileEditor.setAttribute('ondragend', 'handleDragEnd(event)');
 
     fileEditor.innerHTML = `
         <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
             <div class="file-editor-header-left">
+                <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
                 <span class="collapse-icon">▼</span>
                 <h3>File #${fileIndex + 1}</h3>
                 <span class="file-editor-names"></span>
@@ -220,7 +227,7 @@ function addFile() {
         <div class="inline-fields">
             <div class="form-group">
                 <label>Filename</label>
-                <input type="text" name="files[${fileIndex}][filename]" required>
+                <input type="text" name="files[${fileIndex}][filename]" required oninput="updateDisplayFileDropdown()">
             </div>
 
             <div class="form-group">
@@ -268,7 +275,7 @@ function addFile() {
 
         <div class="form-group">
             <label for="files[${fileIndex}][displayName]">Display Name (optional)</label>
-            <input type="text" id="files[${fileIndex}][displayName]" name="files[${fileIndex}][displayName]" placeholder="Leave empty to use filename">
+            <input type="text" id="files[${fileIndex}][displayName]" name="files[${fileIndex}][displayName]" placeholder="Leave empty to use filename" oninput="updateDisplayFileDropdown()">
         </div>
 
         <div class="form-group">
@@ -313,11 +320,17 @@ function addFile() {
     const renderSelect = fileEditor.querySelector('.render-select');
     updateFileFields(renderSelect);
 
+    // Update display file dropdown to include new file
+    updateDisplayFileDropdown();
+
     fileIndex++;
 }
 
 function removeFile(button) {
     button.closest('.file-editor').remove();
+
+    // Update display file dropdown to remove deleted file
+    updateDisplayFileDropdown();
 }
 
 function updateFileFields(renderSelect) {
@@ -330,11 +343,11 @@ function updateFileFields(renderSelect) {
 
     // Hide type for image/file/file-link/link modes
     if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link') {
-        typeField.style.display = 'none';
+        typeField.classList.add('hidden');
         // Set type to match render mode
         typeSelect.value = renderMode;
     } else {
-        typeField.style.display = '';
+        typeField.classList.remove('hidden');
         // If current type value is not valid for this dropdown, reset to auto-detect
         const currentValue = typeSelect.value;
 
@@ -353,22 +366,22 @@ function updateFileFields(renderSelect) {
 
         if (hasContent) {
             // Text file - show content field, hide indicator
-            contentField.style.display = '';
+            contentField.classList.remove('hidden');
             if (fileExistsIndicator) {
-                fileExistsIndicator.style.display = 'none';
+                fileExistsIndicator.classList.add('hidden');
             }
         } else {
             // Binary file or no existing file - hide content, show indicator
-            contentField.style.display = 'none';
+            contentField.classList.add('hidden');
             if (fileExistsIndicator) {
-                fileExistsIndicator.style.display = '';
+                fileExistsIndicator.classList.remove('hidden');
             }
         }
     } else {
-        contentField.style.display = '';
+        contentField.classList.remove('hidden');
         // Hide file exists indicator
         if (fileExistsIndicator) {
-            fileExistsIndicator.style.display = 'none';
+            fileExistsIndicator.classList.add('hidden');
         }
     }
 }
@@ -379,23 +392,21 @@ function updateDisplayModeFields() {
 
     // Show file selector only for single-file modes
     if (displayMode === 'single-normal' || displayMode === 'single-wide') {
-        selectedFileGroup.style.display = '';
+        selectedFileGroup.classList.remove('hidden');
     } else {
-        selectedFileGroup.style.display = 'none';
+        selectedFileGroup.classList.add('hidden');
     }
 }
 
 function toggleFileEditor(event, header) {
     const fileEditor = header.closest('.file-editor');
     const icon = header.querySelector('.collapse-icon');
-    const body = fileEditor.querySelector('.file-editor-body');
     const namesSpan = header.querySelector('.file-editor-names');
 
     if (fileEditor.classList.contains('collapsed')) {
         // Expand
         fileEditor.classList.remove('collapsed');
         icon.textContent = '▼';
-        body.style.display = '';
         namesSpan.textContent = '';
     } else {
         // Collapse - show filename and display name
@@ -419,8 +430,135 @@ function toggleFileEditor(event, header) {
 
         fileEditor.classList.add('collapsed');
         icon.textContent = '►︎';
-        body.style.display = 'none';
         namesSpan.innerHTML = names ? ' - ' + names + hiddenIndicator : '';
+    }
+}
+
+// Drag and drop functionality
+let draggedElement = null;
+
+function handleDragStart(event) {
+    draggedElement = event.target.closest('.file-editor');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/html', draggedElement.innerHTML);
+    draggedElement.classList.add('dragging');
+}
+
+function handleDragOver(event) {
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
+    event.dataTransfer.dropEffect = 'move';
+
+    const targetElement = event.target.closest('.file-editor');
+    if (targetElement && targetElement !== draggedElement) {
+        const container = document.getElementById('files-container');
+        const allEditors = Array.from(container.querySelectorAll('.file-editor'));
+        const draggedIndex = allEditors.indexOf(draggedElement);
+        const targetIndex = allEditors.indexOf(targetElement);
+
+        if (draggedIndex < targetIndex) {
+            targetElement.parentNode.insertBefore(draggedElement, targetElement.nextSibling);
+        } else {
+            targetElement.parentNode.insertBefore(draggedElement, targetElement);
+        }
+    }
+
+    return false;
+}
+
+function handleDrop(event) {
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
+    return false;
+}
+
+function handleDragEnd(event) {
+    draggedElement.classList.remove('dragging');
+    draggedElement = null;
+
+    // Renumber all files and update form field indices
+    const container = document.getElementById('files-container');
+    const allEditors = container.querySelectorAll('.file-editor');
+    allEditors.forEach((editor, index) => {
+        // Update visual file number
+        const h3 = editor.querySelector('h3');
+        if (h3) {
+            h3.textContent = 'File #' + (index + 1);
+        }
+
+        // Update data attribute
+        editor.setAttribute('data-file-index', index);
+
+        // Update all form field names to use new index
+        editor.querySelectorAll('input, textarea, select').forEach(field => {
+            if (field.name && field.name.startsWith('files[')) {
+                // Replace files[oldIndex] with files[newIndex]
+                field.name = field.name.replace(/^files\[\d+\]/, `files[${index}]`);
+
+                // Update id if it exists and follows the same pattern
+                if (field.id && field.id.startsWith('files[')) {
+                    field.id = field.id.replace(/^files\[\d+\]/, `files[${index}]`);
+                }
+            } else if (field.name && field.name.startsWith('file_uploads[')) {
+                // Update file upload field names too
+                field.name = field.name.replace(/^file_uploads\[\d+\]/, `file_uploads[${index}]`);
+            }
+        });
+
+        // Update labels that reference file fields
+        editor.querySelectorAll('label').forEach(label => {
+            if (label.htmlFor && label.htmlFor.startsWith('files[')) {
+                label.htmlFor = label.htmlFor.replace(/^files\[\d+\]/, `files[${index}]`);
+            }
+        });
+    });
+
+    // Update the display file dropdown to reflect new order
+    updateDisplayFileDropdown();
+}
+
+function updateDisplayFileDropdown() {
+    const selectedFileSelect = document.getElementById('selectedFile');
+    if (!selectedFileSelect) return;
+
+    const currentValue = selectedFileSelect.value;
+    const currentSelectedIndex = selectedFileSelect.selectedIndex;
+    const container = document.getElementById('files-container');
+    const allEditors = container.querySelectorAll('.file-editor');
+
+    // Clear existing options
+    selectedFileSelect.innerHTML = '';
+
+    // Rebuild options in new order
+    let matchFound = false;
+    allEditors.forEach((editor, index) => {
+        const filenameInput = editor.querySelector('input[name*="[filename]"]');
+        const displayNameInput = editor.querySelector('input[name*="[displayName]"]');
+
+        if (filenameInput) {
+            const option = document.createElement('option');
+            option.value = filenameInput.value || '';
+            option.textContent = `${index + 1}. ${filenameInput.value || 'unnamed'}`;
+
+            if (displayNameInput && displayNameInput.value) {
+                option.textContent += ` (${displayNameInput.value})`;
+            }
+
+            // Try to restore selection by matching filename first
+            if (filenameInput.value && filenameInput.value === currentValue) {
+                option.selected = true;
+                matchFound = true;
+            }
+
+            selectedFileSelect.appendChild(option);
+        }
+    });
+
+    // If no match was found by filename, restore by index position
+    if (!matchFound && currentSelectedIndex >= 0 && currentSelectedIndex < selectedFileSelect.options.length) {
+        selectedFileSelect.selectedIndex = currentSelectedIndex;
     }
 }
 

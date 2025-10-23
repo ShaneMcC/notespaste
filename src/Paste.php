@@ -248,6 +248,22 @@ class Paste
         $this->saveMeta();
     }
 
+    public function reorderFiles(array $orderedFilenames): void
+    {
+        $newFilesArray = [];
+
+        // Rebuild files array in the specified order
+        foreach ($orderedFilenames as $filename) {
+            if (isset($this->meta['files'][$filename])) {
+                $newFilesArray[$filename] = $this->meta['files'][$filename];
+            }
+        }
+
+        $this->meta['files'] = $newFilesArray;
+        $this->meta['updatedAt'] = date('c');
+        $this->saveMeta();
+    }
+
     public function getFile(string $filename): ?string
     {
         $filePath = $this->basePath . '/files/' . $filename;

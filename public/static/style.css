@@ -459,6 +459,24 @@ footer {
     font-size: 0.9em;
 }
 
+.drag-handle {
+    cursor: grab;
+    color: var(--text-tertiary);
+    user-select: none;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+.file-editor.dragging {
+    opacity: 0.5;
+}
+
+.file-editor {
+    transition: opacity 0.2s;
+}
+
 .file-hidden-indicator {
     color: var(--text-muted);
     font-size: 0.85em;
