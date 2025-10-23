@@ -117,7 +117,6 @@ When a paste is saved or re-rendered:
 
 **Benefits:**
 - Viewing pastes requires no PHP execution
-- Template changes can be applied via "Rerender" without editing paste
 - Direct file access through Apache is extremely fast
 
 ### 3. BASE_PATH Detection
@@ -138,7 +137,7 @@ This allows the app to work at:
 
 All internal redirects use `BASE_PATH . '/route'` and templates use `{{ basePath }}/route`.
 
-**Exception:** Rendered HTML uses relative paths (`./files/filename`) so file links work regardless of base path.
+**Exception:** Rendered HTML uses relative paths (`./files/filename`) so file links work regardless of base path, allows changing the ID of pastes easily.
 
 ### 4. Render Modes
 
@@ -195,7 +194,7 @@ Simple session-based auth with .htpasswd:
 
 **Security notes:**
 - Sessions are PHP's default (PHPSESSID cookie)
-- Passwords stored as bcrypt hashes in .htpasswd
+- Passwords stored as bcrypt hashes in .htpasswd or AUTH_USER/AUTH_PASSWORD/AUTH_PASSWORD_HASH env vars
 - No CSRF tokens (could be added)
 - No rate limiting (could be added)
 
@@ -557,8 +556,7 @@ rm /var/lib/php/sessions/sess_*
 1. **XSS in paste content** - Markdown and plain text are not sanitized (by design for code sharing)
 2. **Session fixation** - No session regeneration on login (should add `session_regenerate_id(true)`)
 3. **Timing attacks** - Password comparison may be vulnerable (PHP's password_verify is safe, but htpasswd parsing isn't)
-4. **No HTTPS enforcement** - Credentials sent in plaintext over HTTP (should use HTTPS)
-5. **No content-type validation** - Files accepted with any extension (could restrict)
+4. **No content-type validation** - Files accepted with any extension (could restrict)
 
 ### Recommendations for Production
 
@@ -620,10 +618,9 @@ Potential features to add:
 9. **API** - JSON API for programmatic access
 10. **Webhooks** - Notify external services on paste create/update
 11. **Markdown preview** - Live preview when editing markdown
-12. **Drag-and-drop upload** - Drag files into edit page
-13. **Paste templates** - Pre-defined file structures
-14. **Collaboration** - Multiple users can edit same paste
-15. **Comments** - Allow commenting on pastes
+12. **Paste templates** - Pre-defined file structures
+13. **Collaboration** - Multiple users can edit same paste
+14. **Comments** - Allow commenting on pastes
 
 ## Contributing Guidelines
 
@@ -882,9 +879,3 @@ Regular maintenance:
 2. **Monthly**: Review access logs for suspicious activity
 3. **Quarterly**: Update dependencies with `composer update`
 4. **Yearly**: Review and update .htpasswd credentials
-
----
-
-**Last Updated**: 2025-10-23
-**Version**: 2.0.0 (added display modes, file options, Docker support, file uploads)
-**Maintainer**: See config/.htpasswd for current admin

@@ -8,7 +8,7 @@ A simple, file-based pastebin application built with PHP.
 - **Multi-file pastes** - Each paste can contain multiple files
 - **Public/Private pastes** - Control visibility of your pastes
 - **File uploads** - Upload text files, images, and binary files
-- **Display modes** - Single-file or multi-file layouts, normal or wide
+- **Display modes** - Single-file or multi-file layouts, fixed-width or wide screen.
 - **File organization** - Drag-and-drop reordering, hide/collapse options
 - **Multiple render modes:**
   - Plain text
@@ -20,87 +20,39 @@ A simple, file-based pastebin application built with PHP.
   - URL lists
 - **Flexible file display** - Collapsed sections, custom display names, descriptions
 - **Clean URLs** - SEO-friendly URLs with mod_rewrite
-- **Authentication** - Simple .htpasswd-based login
+- **Authentication** - Simple .htpasswd-based or env-var based login
 - **Template rendering** - Pre-rendered HTML for fast delivery
-- **Rerender functionality** - Update rendered output without editing
 - **Docker support** - Easy containerized deployment
 - **Dark mode** - Automatic theme based on system preference
 
-## Setup
-
-### Standard Installation
-
-1. **Install dependencies:**
-   ```bash
-   composer install
-   ```
-
-2. **Configure authentication:**
-   ```bash
-   cp config/.htpasswd.example config/.htpasswd
-   # Edit config/.htpasswd and add your users
-   # Generate password hashes with: htpasswd -nbB username password
-   ```
-
-3. **Configure web server:**
-   - Ensure Apache mod_rewrite is enabled
-   - Point document root to the `public/` directory
-   - The `.htaccess` file handles URL routing
-
-4. **Set permissions:**
-   ```bash
-   chmod 755 public/notes/ src/ templates/ public/static/
-   chmod 644 config/.htpasswd
-   chmod 644 public/.htaccess
-   ```
-
-### Docker Deployment
-
-#### Building the Image
-
-```bash
-docker build -t pastebin .
-```
-
-#### Running with Docker
+## Docker Deployment
 
 ```bash
 docker run -d \
   -p 8080:80 \
+  -e AUTH_USER=admin \
+  -e AUTH_PASSWORD=password123 \
   -v /path/to/notes:/app/public/notes \
-  -v /path/to/config:/app/config \
-  --name pastebin \
-  pastebin:latest
+  ghcr.io/shanemcc/notespaste:latest
 ```
-
-#### Required Volumes
+### Required Volumes
 
 - `/app/public/notes` - Paste data persistence (required)
 - `/app/config` - Configuration files including `.htpasswd` (optional)
 
-#### Configuration via Environment Variables
+### Configuration
 
-```bash
-docker run -d \
-  -e HTPASSWD_PATH=/app/config/.htpasswd \
-  -e NOTES_DIR=/app/public/notes \
-  -p 8080:80 \
-  pastebin:latest
-```
+The application can be configured via environment variables:
 
-## Configuration
-
-The application can be configured via environment variables or the `config/config.php` file.
-
-### Environment Variables
+#### Environment Variables
 
 **File Paths:**
-- `HTPASSWD_PATH` - Path to .htpasswd file (default: `config/.htpasswd`)
-- `NOTES_DIR` - Path to notes storage directory (default: `public/notes`)
+- `HTPASSWD_PATH` - Path to .htpasswd file (default: `/app/config/.htpasswd`)
+- `NOTES_DIR` - Path to notes storage directory (default: `/app/public/notes`)
 
 **Authentication (optional):**
 - `AUTH_USER` - Username for environment-based authentication
-- `AUTH_PASSWORD_HASH` - Bcrypt password hash (recommended, takes priority over AUTH_PASSWORD)
+- `AUTH_PASSWORD_HASH` - Bcrypt password hash (recommended, takes priority over `AUTH_PASSWORD`)
 - `AUTH_PASSWORD` - Plain text password (simpler, less secure)
 
 ### Authentication Methods
@@ -128,34 +80,16 @@ The application supports two authentication methods that can be used together:
    ```
 
 2. **.htpasswd File** (traditional method):
-   - Place bcrypt-hashed credentials in `config/.htpasswd`
+   - Place bcrypt-hashed credentials in a file mounted at `/app/config/.htpasswd` (or wherever `HTPASSWD_PATH` pints)
    - Format: `username:$2y$10$...` (one per line)
    - Generate with: `htpasswd -nbB username password`
 
 Both methods can coexist - the application will check environment variables first, then fall back to the .htpasswd file.
 
-### Example config/config.php
-
-```php
-<?php
-return [
-    'htpasswd_path' => getenv('HTPASSWD_PATH') ?: __DIR__ . '/.htpasswd',
-    'notes_dir' => getenv('NOTES_DIR') ?: __DIR__ . '/../public/notes',
-];
-```
-
-## Default Credentials
-
-If using the included `.htpasswd.example`:
-- Username: `admin`
-- Password: `password123`
-
-**⚠️ Change these immediately after setup or use environment variables instead!**
-
 ## Usage
 
 ### For Anonymous Users
-- View public pastes on the homepage at `/`
+- View public pastes on the homepage
 - Public pastes are visible to everyone
 
 ### For Logged-In Users
@@ -171,7 +105,7 @@ If using the included `.htpasswd.example`:
 - **Summary** - Optional, shown in paste listings
 - **Description** - Optional, shown at the top of the paste
 - **Author** - Defaults to your username
-- **Public/Private** - Control who can view the paste
+- **Public/Private** - Control if pastes are visible by default
 - **Display Mode** - How to display the paste (see Display Modes below)
 - **Multiple files** - Add as many files as needed
 
@@ -215,9 +149,8 @@ Each file in a paste can be configured with these options:
 In addition to pasting text content, you can upload files directly:
 
 ### Upload Process
-1. Click "Upload File" button for any file entry
-2. Select a file from your computer
-3. The application auto-detects:
+1. Click "Upload File" button for any file entry and select a file from your computer, or drag+drop a file onto the file entry
+2. The application auto-detects:
    - **Images** - Automatically set to "Image" render mode
    - **Binary files** - Automatically set to "File Download" mode
    - **Text files** - Keep current render mode
@@ -227,67 +160,10 @@ In addition to pasting text content, you can upload files directly:
 - Images show a preview thumbnail when editing
 - Binary content is never loaded into textarea (only metadata shown)
 
-## File Structure
-
-```
-/
-├── config/                  # Configuration directory
-│   ├── config.php          # Main configuration
-│   ├── .htpasswd           # User credentials
-│   └── .htpasswd.example   # Example credentials file
-├── public/                 # Web root directory
-│   ├── index.php          # Main routing file
-│   ├── .htaccess          # Apache rewrite rules
-│   ├── static/            # CSS and static assets
-│   │   └── style.css
-│   └── notes/             # Paste storage
-│       └── {paste-id}/
-│           ├── _meta.json
-│           ├── files/
-│           └── {slug}.html
-├── src/                   # PHP classes (PSR-4: App\)
-│   ├── Auth.php
-│   ├── Paste.php
-│   ├── PasteRenderer.php
-│   └── Helpers.php
-├── templates/             # Twig templates
-├── vendor/               # Composer dependencies
-├── composer.json
-├── Dockerfile
-└── README.md
-```
-
-## Requirements
-
-- PHP 8.1+
-- Apache with mod_rewrite
-- Composer
-- Docker (optional, for containerized deployment)
-
 ## Security
 
 ### Current Security Measures
 - **Private pastes are security through obscurity** - Private pastes are not password protected. They are only hidden from the homepage listing. Anyone with the full URL can view the pre-rendered HTML file directly.
-- `.htpasswd` files are protected from direct access
 - `_meta.json` files are blocked from direct access
 - Directory listings are disabled
-- Sessions are used for authentication state
-- **Executable file protection** - PHP, CGI, Python, and other executable files in paste storage are forced through a proxy to prevent direct execution
-- Binary content detection prevents accidental rendering of binary data as text
-
-### Important Security Note
-⚠️ **Private pastes are NOT truly private!** The "private" flag only removes them from the public listing on the homepage. Because pastes are pre-rendered to static HTML files, anyone who knows or guesses the paste ID and slug can view the content directly by accessing `/notes/{id}/{slug}.html`.
-
-If you need truly private content, use additional security measures such as:
-- HTTP basic auth at the web server level
-- VPN or firewall restrictions
-- A different application with proper authentication on every request
-
-## Technology Stack
-
-- **Backend**: PHP 8.1+ with Bramus Router
-- **Templating**: Twig
-- **Markdown**: League CommonMark
-- **Syntax Highlighting**: highlight.js (client-side)
-- **Styling**: Custom CSS with dark mode support
-- **Containerization**: Docker
+- **Executable file protection** - While most files can be directly accessed (if the notes directory is under `/app/public`), we forcefully proxy PHP, CGI, Python, and certain other executable files through the application to prevent execution.
