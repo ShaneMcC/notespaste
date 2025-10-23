@@ -19,7 +19,7 @@ jobs:
       - name: Build and Deploy to GHCR
         uses: mr-smithers-excellent/docker-build-push@v6
         with:
-          image: bill-tracker
+          image: notespaste
           tags: latest
           registry: ghcr.io
           username: ${{ github.actor }}
