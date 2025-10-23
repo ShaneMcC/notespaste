@@ -15,29 +15,39 @@ This is a file-based pastebin application built with PHP 8.1+ that prioritizes s
 
 ```
 /
-├── composer.json           # Dependencies and autoloading
-├── .htaccess              # URL routing and security rules
-├── .htpasswd              # User credentials (bcrypt hashed)
-├── index.php              # Main routing file
-├── src/                   # PHP classes (PSR-4 autoloaded as App\)
-│   ├── Auth.php          # Authentication logic
-│   ├── Paste.php         # Paste management
-│   ├── PasteRenderer.php # HTML rendering
-│   └── Helpers.php       # Utility functions
-├── templates/            # Twig templates
+├── config/                  # Configuration directory
+│   ├── config.php          # Main configuration
+│   ├── .htpasswd           # User credentials (bcrypt hashed)
+│   └── .htpasswd.example   # Example credentials file
+├── public/                 # Web root directory
+│   ├── index.php          # Main routing file
+│   ├── .htaccess          # Apache rewrite rules
+│   ├── static/            # CSS and static assets
+│   │   └── style.css
+│   └── notes/             # Paste storage
+│       └── {paste-id}/
+│           ├── _meta.json
+│           ├── files/
+│           └── {slug}.html
+├── src/                   # PHP classes (PSR-4: App\)
+│   ├── Auth.php
+│   ├── Paste.php
+│   ├── PasteRenderer.php
+│   └── Helpers.php
+├── templates/             # Twig templates
 │   ├── base.html.twig
 │   ├── home.html.twig
 │   ├── paste.html.twig
 │   ├── edit.html.twig
 │   ├── login.html.twig
 │   └── rerender-results.html.twig
-├── static/
-│   └── style.css         # All application CSS
-└── notes/                # Paste storage
-    └── {paste-id}/
-        ├── _meta.json
-        ├── files/
-        └── {slug}.html
+├── vendor/               # Composer dependencies
+├── composer.json
+├── Dockerfile
+├── .github/workflows/    # CI/CD pipeline
+│   └── build-and-deploy.yml
+├── README.md
+└── CLAUDE.md
 ```
 
 ## Key Design Decisions
@@ -65,20 +75,32 @@ notes/caith6XaePeeKi0queic/
   "description": "Optional description shown at top",
   "author": "username",
   "public": true,
+  "displayMode": "multi-normal",
+  "selectedFile": "example.md",
   "createdAt": "2025-01-15T10:30:00+00:00",
   "updatedAt": "2025-01-15T14:20:00+00:00",
-  "files": [
-    {
-      "filename": "example.md",
+  "files": {
+    "example.md": {
+      "displayName": "My Example",
+      "description": "This is an example file",
       "render": "rendered",
-      "type": "markdown"
+      "type": "markdown",
+      "hidden": false,
+      "unwrapped": false,
+      "collapsed": false,
+      "collapsedDescription": ""
     },
-    {
-      "filename": "script.php",
+    "script.php": {
+      "displayName": "",
+      "description": "",
       "render": "highlighted",
-      "type": "php"
+      "type": "php",
+      "hidden": false,
+      "unwrapped": false,
+      "collapsed": true,
+      "collapsedDescription": "PHP utility script"
     }
-  ]
+  }
 }
 ```
 
@@ -129,22 +151,37 @@ Each file in a paste has a `render` mode that determines how it's displayed:
 | `rendered` | Markdown to HTML | League CommonMark parser |
 | `image` | Display image | `<img src="./files/{filename}">` |
 | `file` | Download link | `<a href="./files/{filename}" download>` |
+| `file-link` | View file link | `<a href="./files/{filename}" target="_blank">` (no download attribute) |
 | `link` | List of URLs | Each line becomes `<a>` tag |
 
 The `type` field specifies language for highlighting or additional context.
 
+**Auto-detection for uploads:**
+- Images (`image/*` MIME type) automatically set to `image` mode
+- Binary files (non-text MIME) automatically set to `file` mode
+- Text files keep user-selected render mode
+
 ### 5. Public/Private Visibility
 
-**Why:** Allow users to create private notes visible only when logged in.
+**Why:** Allow users to hide pastes from public listings (security through obscurity).
 
 - `public: true` - Visible to everyone, appears in public paste list
-- `public: false` - Only visible to logged-in users, shown with 🔒 icon
+- `public: false` - Hidden from public listing, only shown to logged-in users in their paste list, displays 🔒 icon
+
+**IMPORTANT SECURITY NOTE:**
+Private pastes are **NOT truly private**! Because pastes are pre-rendered to static HTML files served directly by Apache, anyone with the full URL (`/notes/{id}/{slug}.html`) can view the content without authentication. The "private" flag only:
+- Removes the paste from the public homepage listing
+- Shows a lock icon to indicate it's unlisted
+- Requires login to see it in the admin paste list
+
+This is **security through obscurity** - the paste IDs are random and long (20-30 characters), making them hard to guess, but they are not password-protected.
 
 Implementation:
 - `Paste::listAll($publicOnly)` filters based on authentication state
-- Anonymous users see only public pastes
-- Logged-in users see all pastes
+- Anonymous users see only public pastes in listing
+- Logged-in users see all pastes in listing
 - Lock icon in title: `{% if not meta.public %}🔒 {% endif %}`
+- Direct HTML file access bypasses all PHP authentication checks
 
 ### 6. Authentication Flow
 
@@ -161,6 +198,109 @@ Simple session-based auth with .htpasswd:
 - Passwords stored as bcrypt hashes in .htpasswd
 - No CSRF tokens (could be added)
 - No rate limiting (could be added)
+
+### 7. Display Modes
+
+**Why:** Provide flexibility for different content types and presentation needs.
+
+The application supports four display modes:
+
+| Mode | Container Width | Files Shown | Wrapped |
+|------|----------------|-------------|---------|
+| `multi-normal` | Standard (800px) | All non-hidden | Yes |
+| `multi-wide` | Full width | All non-hidden | Yes |
+| `single-normal` | Standard (800px) | Selected file only | No (forced unwrapped) |
+| `single-wide` | Full width | Selected file only | No (forced unwrapped) |
+
+**Implementation:**
+- Set via dropdown in edit form: `$_POST['displayMode']`
+- Stored in `_meta.json`: `"displayMode": "multi-normal"`
+- Single-file mode requires `selectedFile` to be set
+- CSS media query applies `.container { max-width: 100%; }` for wide modes
+- In `PasteRenderer.php`, single-file mode forces `unwrapped: true` on the selected file
+
+### 8. File Options
+
+Each file in `_meta.json` has additional metadata beyond filename and render mode:
+
+```json
+{
+  "filename.txt": {
+    "displayName": "My Custom Name",        // Optional: Override filename in UI
+    "description": "File description",      // Optional: Shown above content
+    "type": "javascript",                   // Language for highlighting
+    "render": "highlighted",                // How to render the file
+    "hidden": false,                        // Hide in multi-file mode
+    "unwrapped": false,                     // Render without wrapper/header
+    "collapsed": true,                      // Start collapsed (multi-file)
+    "collapsedDescription": "Click to expand" // Shown when collapsed
+  }
+}
+```
+
+**Usage:**
+- `hidden: true` - File exists but doesn't appear in multi-file view (useful for data files referenced by other files)
+- `unwrapped: true` - Removes file header and wrapper, content flows directly into page (good for narrative content)
+- `collapsed: true` - File section starts collapsed, user can expand by clicking header
+- `collapsedDescription` - Brief summary visible even when collapsed
+- `displayName` - Override filename in headers (useful for long/technical filenames)
+- `description` - Explanatory text shown above file content
+
+### 9. Configuration System
+
+**Why:** Support different deployment environments without code changes.
+
+Configuration is loaded from `config/config.php` which reads environment variables:
+
+```php
+return [
+    'htpasswd_path' => getenv('HTPASSWD_PATH') ?: __DIR__ . '/.htpasswd',
+    'notes_dir' => getenv('NOTES_DIR') ?: __DIR__ . '/../public/notes',
+];
+```
+
+This allows:
+- Docker deployments to mount volumes at custom paths
+- Development environments to use different locations
+- Testing environments to use temporary directories
+
+**Initialization:**
+```php
+// In public/index.php
+$config = require __DIR__ . '/../config/config.php';
+Auth::init($config['htpasswd_path']);
+Paste::setNotesDir($config['notes_dir']);
+```
+
+### 10. Theme Support
+
+**Why:** Provide comfortable viewing in different lighting conditions.
+
+The application uses CSS custom properties for theming:
+
+```css
+:root {
+    --bg-primary: #f5f5f5;
+    --text-primary: #333;
+    --link-color: #3498db;
+    /* ... 20+ more variables */
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #1a1a1a;
+        --text-primary: #e0e0e0;
+        --link-color: #4dabf7;
+        /* ... dark mode overrides */
+    }
+}
+```
+
+**Implementation:**
+- All colors defined as CSS variables in `public/static/style.css`
+- No hardcoded colors in styles
+- Automatic theme switching based on browser/OS preference
+- 20+ languages supported for syntax highlighting via highlight.js
 
 ## Common Development Tasks
 
@@ -250,6 +390,37 @@ case 'custom':
         {{ file.content|raw }}
     </div>
 {% endif %}
+```
+
+### Handling File Uploads
+
+File uploads use multipart form data. The `processFileData()` helper function in `public/index.php`:
+
+1. Checks for uploaded file: `$_FILES['file_uploads']['tmp_name'][$index]`
+2. Auto-detects render mode:
+   - Images (`image/*` MIME) → `render: 'image'`
+   - Binary (non-text MIME) → `render: 'file'`
+3. Falls back to text content from textarea if no upload
+4. Sanitizes filename via `Helpers::sanitizeFilename()`
+
+**Example:**
+```php
+// In form
+<input type="file" name="file_uploads[0]">
+
+// In route handler (processFileData helper)
+if (isset($_FILES['file_uploads']['tmp_name'][0]) &&
+    $_FILES['file_uploads']['error'][0] === UPLOAD_ERR_OK) {
+    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][0]);
+    $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][0]);
+
+    // Auto-detect render mode based on MIME type
+    if (strpos($mimeType, 'image/') === 0) {
+        $render = 'image';
+    } elseif (strpos($mimeType, 'text/') !== 0) {
+        $render = 'file';
+    }
+}
 ```
 
 ### Changing Paste ID Generation
@@ -357,25 +528,29 @@ rm /var/lib/php/sessions/sess_*
 
 1. **No CSRF protection** - Forms don't have CSRF tokens (could add)
 2. **No rate limiting** - Login attempts not throttled (could add)
-3. **No file uploads** - Files must be pasted as text (could add multipart upload)
-4. **No paste deletion** - Once created, pastes exist forever (could add delete route)
-5. **No edit history** - Edits overwrite previous version (could add versioning)
-6. **No search** - No way to search paste content (could add with grep or search index)
-7. **No pagination** - All pastes load on homepage (could add pagination)
-8. **No API** - Only web interface available (could add JSON API)
-9. **Single user tier** - All logged-in users have same permissions (could add roles)
-10. **No paste expiration** - Pastes don't auto-delete (could add TTL)
+3. **No paste deletion** - Once created, pastes exist forever (could add delete route)
+4. **No edit history** - Edits overwrite previous version (could add versioning)
+5. **No search** - No way to search paste content (could add with grep or search index)
+6. **No pagination** - All pastes load on homepage (could add pagination)
+7. **No API** - Only web interface available (could add JSON API)
+8. **Single user tier** - All logged-in users have same permissions (could add roles)
+9. **No paste expiration** - Pastes don't auto-delete (could add TTL)
+10. **No file size limits** - Large files can cause memory issues (could add validation)
+11. **No dark mode toggle** - Theme follows system preference only (could add manual toggle)
+12. **No content-type restrictions** - Any file type accepted (could whitelist extensions)
 
 ## Security Considerations
 
 ### Current Security Measures
 
-1. **Private pastes require authentication** - Enforced in router before serving HTML
+1. **Private pastes are security through obscurity** - Pre-rendered HTML is accessible to anyone with the URL. "Private" only hides from homepage listing.
 2. **_meta.json blocked** - .htaccess prevents direct access: `RewriteRule ^notes/.*/_meta\.json$ - [F,L]`
 3. **Directory indexes disabled** - `Options -Indexes` in .htaccess
 4. **Password hashing** - bcrypt via .htpasswd
-5. **Session-based auth** - PHP sessions for authentication state
+5. **Session-based auth** - PHP sessions for authentication state (only affects admin UI, not paste viewing)
 6. **File path validation** - Filenames sanitized to prevent directory traversal
+7. **Executable file proxy** - .htaccess forces PHP, CGI, Python, and other executable extensions through PHP proxy route to prevent direct execution
+8. **Binary content detection** - Helper function identifies binary content to prevent display issues
 
 ### Potential Vulnerabilities
 
@@ -625,7 +800,7 @@ When modifying this application:
 
 Before deploying to production:
 
-- [ ] Change default credentials in .htpasswd
+- [ ] Change default credentials in config/.htpasswd
 - [ ] Enable HTTPS and enforce redirect
 - [ ] Set `display_errors = 0` in php.ini
 - [ ] Enable error logging to file
@@ -642,6 +817,33 @@ Before deploying to production:
 - [ ] Verify public/private paste visibility
 - [ ] Test rerender functionality
 - [ ] Check for XSS vulnerabilities in content
+
+### Docker Deployment
+
+The included Dockerfile provides containerized deployment:
+
+**Dockerfile:**
+1. Uses `shanemcc/docker-apache-php-base:latest` as base
+2. Copies application to `/app`
+3. Symlinks `/app/public` to `/var/www/html`
+4. Installs Composer dependencies
+5. Sets ownership to `www-data` user
+
+**Required Volumes:**
+- `/app/public/notes` - **Required** for paste data persistence
+- `/app/config` - **Optional** for custom configuration and `.htpasswd`
+
+**CI/CD Pipeline:**
+
+GitHub Actions workflow (`.github/workflows/build-and-deploy.yml`):
+1. Triggers on push to `master` or manual dispatch
+2. Builds Docker image
+3. Publishes to GitHub Container Registry (ghcr.io)
+4. Publishes to private Docker registry (if configured)
+
+**Secrets Required:**
+- `GITHUB_TOKEN` (automatic)
+- `DOCKER_REGISTRY`, `DOCKER_REPO`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` (for private registry)
 
 ## Support and Maintenance
 
@@ -683,6 +885,6 @@ Regular maintenance:
 
 ---
 
-**Last Updated**: 2025-01-15
-**Version**: 1.0.0
-**Maintainer**: See .htpasswd for current admin
+**Last Updated**: 2025-10-23
+**Version**: 2.0.0 (added display modes, file options, Docker support, file uploads)
+**Maintainer**: See config/.htpasswd for current admin
