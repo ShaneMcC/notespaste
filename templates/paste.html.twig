@@ -52,10 +52,10 @@
             <div class="file-meta">
                 {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
                     Type: {{ file.meta.type }}
-                    {% if file.meta.render not in ['link', 'file-link'] %} | {% endif %}
+                    {% if file.meta.render not in ['file-link'] %} | {% endif %}
                 {% endif %}
-                {% if file.meta.render not in ['link', 'file-link'] %}
-                    <a href="./files/{{ file.filename|url_encode }}">Download</a>
+                {% if file.meta.render not in ['file-link'] %}
+                    <a href="./files/{{ file.filename|url_encode }}">View</a>
                 {% endif %}
             </div>
         </div>
@@ -86,7 +86,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('pre code').forEach(function(block) {
+        // Only highlight code blocks with language-* class
+        document.querySelectorAll('pre code[class*="language-"]').forEach(function(block) {
             hljs.highlightElement(block);
         });
     });

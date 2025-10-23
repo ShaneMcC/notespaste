@@ -299,6 +299,14 @@ function updateFileFields(renderSelect) {
         typeSelect.value = renderMode;
     } else {
         typeField.style.display = '';
+        // If current type value is not valid for this dropdown, reset to auto-detect
+        const currentValue = typeSelect.value;
+
+        // Check if the current value is one of the special render types that shouldn't be in the type dropdown
+        // Also check for '' which happens when an invalid value was set (browser returns '' for invalid values)
+        if (['', 'image', 'file', 'file-link', 'link'].includes(currentValue)) {
+            typeSelect.value = ''; // Reset to Auto-detect
+        }
     }
 
     // Hide content for image/file/file-link modes (but not link - that needs content)

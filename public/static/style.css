@@ -178,6 +178,11 @@ pre {
     margin: 0;
 }
 
+/* Remove padding from pre when it contains code (highlight.js styling) */
+pre:has(code) {
+    padding: 0;
+}
+
 @media (prefers-color-scheme: dark) {
     pre {
         background: #1a1a1a;
@@ -188,6 +193,8 @@ pre {
 code {
     font-family: 'Courier New', monospace;
     font-size: 0.9em;
+    padding: 15px;
+    display: block;
 }
 
 .file-section {
