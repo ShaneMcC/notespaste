@@ -6,7 +6,7 @@
 <header>
     <h1>{% if isNew %}New Paste{% else %}Edit Paste{% endif %}</h1>
     <div class="nav">
-        <a href="{{ basePath }}/" class="button secondary">Home</a>
+        <a href="{{ basePath }}/" class="button">Home</a>
         {% if not isNew %}
             <a href="{{ paste.getHtmlUrl() }}" class="button secondary">View</a>
         {% endif %}
@@ -40,6 +40,29 @@
             <input type="checkbox" id="public" name="public" value="1" {% if meta.public %}checked{% endif %}>
             <label for="public">Public (visible to everyone)</label>
         </div>
+    </div>
+
+    <div class="form-group">
+        <label for="displayMode">Display Mode</label>
+        <select id="displayMode" name="displayMode" onchange="updateDisplayModeFields()">
+            <option value="multi-normal" {% if meta.displayMode == 'multi-normal' or not meta.displayMode %}selected{% endif %}>Multi File: Normal</option>
+            <option value="multi-wide" {% if meta.displayMode == 'multi-wide' %}selected{% endif %}>Multi File: Wide</option>
+            <option value="single-normal" {% if meta.displayMode == 'single-normal' %}selected{% endif %}>Single File: Normal</option>
+            <option value="single-wide" {% if meta.displayMode == 'single-wide' %}selected{% endif %}>Single File: Wide</option>
+        </select>
+    </div>
+
+    <div class="form-group" id="selectedFileGroup" style="display: none;">
+        <label for="selectedFile">Display File</label>
+        <select id="selectedFile" name="selectedFile">
+            {% if meta.files %}
+                {% for filename, fileMeta in meta.files %}
+                    <option value="{{ filename }}" {% if meta.selectedFile == filename %}selected{% endif %}>
+                        {{ loop.index }}. {{ filename }}{% if fileMeta.displayName %} ({{ fileMeta.displayName }}){% endif %}
+                    </option>
+                {% endfor %}
+            {% endif %}
+        </select>
     </div>
 
     <h2>Files</h2>
@@ -103,19 +126,32 @@
                 </div>
 
                 <div class="form-group">
+                    <label for="files[{{ loop.index0 }}][displayName]">Display Name (optional)</label>
+                    <input type="text" id="files[{{ loop.index0 }}][displayName]" name="files[{{ loop.index0 }}][displayName]" value="{{ fileMeta.displayName }}" placeholder="Leave empty to use filename">
+                </div>
+
+                <div class="form-group">
                     <label>Description</label>
                     <input type="text" name="files[{{ loop.index0 }}][description]" value="{{ fileMeta.description }}">
                 </div>
 
+                <div class="form-group">
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="files[{{ loop.index0 }}][hidden]" name="files[{{ loop.index0 }}][hidden]" value="1" {% if fileMeta.hidden %}checked{% endif %}>
+                        <label for="files[{{ loop.index0 }}][hidden]">Hidden (don't show in multi-file mode)</label>
+                    </div>
+                </div>
+
                 <div class="form-group file-content-field">
                     <label>Content (or upload file below)</label>
-                    <textarea name="files[{{ loop.index0 }}][content]" rows="10">{% if fileMeta.render not in ['image', 'file', 'file-link'] %}{{ paste.getFile(filename) }}{% endif %}</textarea>
+                    <textarea name="files[{{ loop.index0 }}][content]" rows="10">{{ paste.getFile(filename) }}</textarea>
                 </div>
 
                 <div class="form-group file-exists-indicator" style="display: none;">
                     <label>Current File</label>
                     <div class="existing-file-info">
-                        <strong>{{ filename }}</strong> exists
+                        {% set isBinary = paste.isFileBinary(filename) %}
+                        <strong>{{ filename }}</strong> {% if isBinary %}(binary file){% else %}exists{% endif %}
                         {% if fileMeta.render == 'image' %}
                         <div style="margin-top: 10px;">
                             <img src="{{ basePath }}/notes/{{ paste.id }}/files/{{ filename }}" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
@@ -208,8 +244,20 @@ function addFile() {
         </div>
 
         <div class="form-group">
+            <label for="files[${fileIndex}][displayName]">Display Name (optional)</label>
+            <input type="text" id="files[${fileIndex}][displayName]" name="files[${fileIndex}][displayName]" placeholder="Leave empty to use filename">
+        </div>
+
+        <div class="form-group">
             <label>Description</label>
             <input type="text" name="files[${fileIndex}][description]">
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${fileIndex}][hidden]" name="files[${fileIndex}][hidden]" value="1">
+                <label for="files[${fileIndex}][hidden]">Hidden (don't show in multi-file mode)</label>
+            </div>
         </div>
 
         <div class="form-group file-content-field">
@@ -254,11 +302,23 @@ function updateFileFields(renderSelect) {
     }
 
     // Hide content for image/file/file-link modes (but not link - that needs content)
+    // However, if there's content in the textarea (text file), show it anyway
     if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link') {
-        contentField.style.display = 'none';
-        // Show file exists indicator if it exists (only for existing files)
-        if (fileExistsIndicator) {
-            fileExistsIndicator.style.display = '';
+        const textarea = contentField.querySelector('textarea');
+        const hasContent = textarea && textarea.value.trim().length > 0;
+
+        if (hasContent) {
+            // Text file - show content field, hide indicator
+            contentField.style.display = '';
+            if (fileExistsIndicator) {
+                fileExistsIndicator.style.display = 'none';
+            }
+        } else {
+            // Binary file or no existing file - hide content, show indicator
+            contentField.style.display = 'none';
+            if (fileExistsIndicator) {
+                fileExistsIndicator.style.display = '';
+            }
         }
     } else {
         contentField.style.display = '';
@@ -269,11 +329,24 @@ function updateFileFields(renderSelect) {
     }
 }
 
+function updateDisplayModeFields() {
+    const displayMode = document.getElementById('displayMode').value;
+    const selectedFileGroup = document.getElementById('selectedFileGroup');
+
+    // Show file selector only for single-file modes
+    if (displayMode === 'single-normal' || displayMode === 'single-wide') {
+        selectedFileGroup.style.display = '';
+    } else {
+        selectedFileGroup.style.display = 'none';
+    }
+}
+
 // Initialize field visibility on page load
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.render-select').forEach(function(select) {
         updateFileFields(select);
     });
+    updateDisplayModeFields();
 });
 </script>
 {% endblock %}

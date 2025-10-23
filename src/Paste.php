@@ -109,6 +109,8 @@ class Paste
             'summary' => $data['summary'] ?? '',
             'author' => $data['author'] ?? 'Anonymous',
             'public' => $data['public'] ?? false,
+            'displayMode' => $data['displayMode'] ?? 'multi-normal',
+            'selectedFile' => $data['selectedFile'] ?? '',
             'createdAt' => date('c'),
             'updatedAt' => date('c'),
             'files' => []
@@ -180,6 +182,8 @@ class Paste
         $this->meta['summary'] = $data['summary'] ?? $this->meta['summary'] ?? '';
         $this->meta['author'] = $data['author'] ?? $this->meta['author'];
         $this->meta['public'] = $data['public'] ?? $this->meta['public'] ?? false;
+        $this->meta['displayMode'] = $data['displayMode'] ?? $this->meta['displayMode'] ?? 'multi-normal';
+        $this->meta['selectedFile'] = $data['selectedFile'] ?? $this->meta['selectedFile'] ?? '';
         $this->meta['updatedAt'] = date('c');
 
         $this->saveMeta();
@@ -238,19 +242,53 @@ class Paste
         $filePath = $this->basePath . '/files/' . $filename;
 
         if (file_exists($filePath)) {
-            // Don't load binary files into memory for editing
             $fileMeta = $this->meta['files'][$filename] ?? [];
             $renderMode = $fileMeta['render'] ?? '';
 
-            // For image, file, and file-link render modes, don't load content
-            if ($renderMode === 'image' || $renderMode === 'file' || $renderMode === 'file-link') {
+            // For image mode, never load content (always binary)
+            if ($renderMode === 'image') {
                 return '';
+            }
+
+            // For file and file-link modes, check if content is binary
+            if ($renderMode === 'file' || $renderMode === 'file-link') {
+                $content = file_get_contents($filePath);
+                // Only return empty if it's actually binary
+                if (Helpers::isBinaryContent($content)) {
+                    return '';
+                }
+                return $content;
             }
 
             return file_get_contents($filePath);
         }
 
         return null;
+    }
+
+    public function isFileBinary(string $filename): bool
+    {
+        $filePath = $this->basePath . '/files/' . $filename;
+
+        if (!file_exists($filePath)) {
+            return false;
+        }
+
+        $fileMeta = $this->meta['files'][$filename] ?? [];
+        $renderMode = $fileMeta['render'] ?? '';
+
+        // Images are always binary
+        if ($renderMode === 'image') {
+            return true;
+        }
+
+        // For file/file-link modes, check actual content
+        if ($renderMode === 'file' || $renderMode === 'file-link') {
+            $content = file_get_contents($filePath);
+            return Helpers::isBinaryContent($content);
+        }
+
+        return false;
     }
 
     public function getFilePath(string $filename): ?string

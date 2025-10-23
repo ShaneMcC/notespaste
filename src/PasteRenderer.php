@@ -28,25 +28,48 @@ class PasteRenderer
     {
         $meta = $this->paste->getMeta();
         $files = $this->paste->getFiles();
+        $displayMode = $meta['displayMode'] ?? 'multi-normal';
+        $selectedFile = $meta['selectedFile'] ?? '';
 
         $renderedFiles = [];
 
-        foreach ($files as $filename => $fileMeta) {
-            $content = $this->paste->getFile($filename);
-            $renderedContent = $this->renderFileContent($filename, $content, $fileMeta);
+        // For single-file mode, only render the selected file
+        if (str_starts_with($displayMode, 'single-') && $selectedFile && isset($files[$selectedFile])) {
+            $fileMeta = $files[$selectedFile];
+            $content = $this->paste->getFile($selectedFile);
+            $renderedContent = $this->renderFileContent($selectedFile, $content, $fileMeta);
 
             $renderedFiles[] = [
-                'filename' => $filename,
+                'filename' => $selectedFile,
                 'meta' => $fileMeta,
                 'content' => $content,
                 'renderedContent' => $renderedContent,
             ];
+        } else {
+            // Multi-file mode: render all non-hidden files
+            foreach ($files as $filename => $fileMeta) {
+                // Skip hidden files in multi-file mode
+                if (!empty($fileMeta['hidden'])) {
+                    continue;
+                }
+
+                $content = $this->paste->getFile($filename);
+                $renderedContent = $this->renderFileContent($filename, $content, $fileMeta);
+
+                $renderedFiles[] = [
+                    'filename' => $filename,
+                    'meta' => $fileMeta,
+                    'content' => $content,
+                    'renderedContent' => $renderedContent,
+                ];
+            }
         }
 
         return $this->twig->render('paste.html.twig', [
             'paste' => $this->paste,
             'meta' => $meta,
             'files' => $renderedFiles,
+            'displayMode' => $displayMode,
             'isLoggedIn' => Auth::isLoggedIn(),
         ]);
     }

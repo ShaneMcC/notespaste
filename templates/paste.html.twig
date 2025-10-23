@@ -4,9 +4,18 @@
 
 {% block extra_styles %}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+{% if displayMode ends with '-wide' %}
+<style>
+.container {
+    max-width: 100%;
+}
+</style>
+{% endif %}
 {% endblock %}
 
 {% block content %}
+{% set isSingleFile = displayMode starts with 'single-' %}
+
 <header>
     <div>
         <h1>{% if not meta.public %}🔒 {% endif %}{{ meta.title }}</h1>
@@ -19,36 +28,50 @@
     </div>
 </header>
 
-{% if meta.description %}
+{% if not isSingleFile and meta.description %}
 <div class="description">
     {{ meta.description }}
 </div>
 {% endif %}
 
-{% for file in files %}
-<div class="file-section">
-    <div class="file-header">
-        <h2>{{ file.filename }}</h2>
-        <div class="file-meta">
-            {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link'] %}
-                Type: {{ file.meta.type }}
-                {% if file.meta.render not in ['link', 'file-link'] %} | {% endif %}
-            {% endif %}
-            {% if file.meta.render not in ['link', 'file-link'] %}
-                <a href="./files/{{ file.filename|url_encode }}">Download</a>
-            {% endif %}
+{% if isSingleFile %}
+    {# Single file mode: just show the file content with optional description #}
+    {% for file in files %}
+        {% if file.meta.description %}
+        <div class="description">
+            {{ file.meta.description }}
+        </div>
+        {% endif %}
+
+        {{ file.renderedContent|raw }}
+    {% endfor %}
+{% else %}
+    {# Multi file mode: show each file in a section #}
+    {% for file in files %}
+    <div class="file-section">
+        <div class="file-header">
+            <h2>{{ file.meta.displayName|default(file.filename) }}</h2>
+            <div class="file-meta">
+                {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
+                    Type: {{ file.meta.type }}
+                    {% if file.meta.render not in ['link', 'file-link'] %} | {% endif %}
+                {% endif %}
+                {% if file.meta.render not in ['link', 'file-link'] %}
+                    <a href="./files/{{ file.filename|url_encode }}">Download</a>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if file.meta.description %}
+        <p class="file-description">{{ file.meta.description }}</p>
+        {% endif %}
+
+        <div class="file-content">
+            {{ file.renderedContent|raw }}
         </div>
     </div>
-
-    {% if file.meta.description %}
-    <p class="file-description">{{ file.meta.description }}</p>
-    {% endif %}
-
-    <div class="file-content">
-        {{ file.renderedContent|raw }}
-    </div>
-</div>
-{% endfor %}
+    {% endfor %}
+{% endif %}
 
 <footer>
     {% if meta.author %}

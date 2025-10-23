@@ -102,6 +102,8 @@ $router->post('/notes/new', function() {
             'summary' => $_POST['summary'] ?? '',
             'author' => $_POST['author'] ?? ucfirst(Auth::getCurrentUser()),
             'public' => isset($_POST['public']) && $_POST['public'] === '1',
+            'displayMode' => $_POST['displayMode'] ?? 'multi-normal',
+            'selectedFile' => $_POST['selectedFile'] ?? '',
         ];
 
         $paste = Paste::create($data);
@@ -121,15 +123,17 @@ $router->post('/notes/new', function() {
                 $render = $fileData['render'] ?? 'plain';
                 $type = $fileData['type'] ?? 'text';
 
-                // Override type for image/file/file-link render modes
-                if (in_array($render, ['image', 'file', 'file-link'])) {
+                // Override type for image/file/file-link/link render modes
+                if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
                     $type = $render;
                 }
 
                 $fileMeta = [
+                    'displayName' => $fileData['displayName'] ?? '',
                     'description' => $fileData['description'] ?? '',
                     'type' => $type,
                     'render' => $render,
+                    'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
                 ];
 
                 // Check if file was uploaded
@@ -189,6 +193,8 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
             'summary' => $_POST['summary'] ?? '',
             'author' => $_POST['author'] ?? ucfirst(Auth::getCurrentUser()),
             'public' => isset($_POST['public']) && $_POST['public'] === '1',
+            'displayMode' => $_POST['displayMode'] ?? 'multi-normal',
+            'selectedFile' => $_POST['selectedFile'] ?? '',
         ];
 
         $paste->update($data);
@@ -211,15 +217,17 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
                 $render = $fileData['render'] ?? 'plain';
                 $type = $fileData['type'] ?? 'text';
 
-                // Override type for image/file/file-link render modes
-                if (in_array($render, ['image', 'file', 'file-link'])) {
+                // Override type for image/file/file-link/link render modes
+                if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
                     $type = $render;
                 }
 
                 $fileMeta = [
+                    'displayName' => $fileData['displayName'] ?? '',
                     'description' => $fileData['description'] ?? '',
                     'type' => $type,
                     'render' => $render,
+                    'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
                 ];
 
                 // Check if file was uploaded
