@@ -1,3 +1,9 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
 # Pastebin Application - Development Documentation
 
 This document provides technical context, architecture details, and development guidelines for the pastebin application.
@@ -10,6 +16,101 @@ This is a file-based pastebin application built with PHP 8.1+ that prioritizes s
 2. **Pre-rendered HTML** - Pastes are rendered to static HTML files for fast delivery
 3. **Authentication via .htpasswd** - Simple HTTP basic auth without database overhead
 4. **Template-driven rendering** - Twig templates for all pages, enabling easy customization
+
+## Commonly Used Commands
+
+### Installation
+
+```bash
+# Install PHP dependencies
+composer install
+
+# Generate password hash for authentication
+php -r "echo password_hash('yourpassword', PASSWORD_BCRYPT);"
+
+# Or use htpasswd tool
+htpasswd -nbB username password
+```
+
+### Docker
+
+```bash
+# Build Docker image
+docker build -t pastebin:latest .
+
+# Run container with authentication
+docker run -d \
+  -p 8080:80 \
+  -e AUTH_USER=admin \
+  -e AUTH_PASSWORD=password123 \
+  -v ./notes:/app/public/notes \
+  pastebin:latest
+
+# Run container with password hash (more secure)
+docker run -d \
+  -p 8080:80 \
+  -e AUTH_USER=admin \
+  -e AUTH_PASSWORD_HASH='$2y$10$...' \
+  -v ./notes:/app/public/notes \
+  pastebin:latest
+
+# View logs
+docker logs -f <container-id>
+
+# Access container shell
+docker exec -it <container-id> bash
+```
+
+### Development
+
+```bash
+# Run PHP built-in server (for testing)
+php -S localhost:8000 -t public/
+
+# Watch Apache logs (in Docker)
+docker exec <container-id> tail -f /var/log/apache2/error.log
+
+# Check PHP syntax
+php -l public/index.php
+php -l src/*.php
+```
+
+### Maintenance
+
+```bash
+# Backup notes directory
+tar -czf backup-notes-$(date +%Y%m%d).tar.gz public/notes/
+
+# Backup authentication file
+cp config/.htpasswd backup-htpasswd-$(date +%Y%m%d)
+
+# Check disk usage
+du -sh public/notes/
+
+# Count total pastes
+ls -1d public/notes/*/ | wc -l
+
+# View paste metadata
+cat public/notes/<paste-id>/_meta.json | jq .
+
+# Fix permissions
+chmod -R 755 public/notes/
+chown -R www-data:www-data public/notes/
+```
+
+### Testing
+
+```bash
+# Currently no automated tests
+# Manual testing checklist:
+# 1. Create new paste
+# 2. Edit existing paste
+# 3. Test all render modes (plain, highlighted, rendered, image, file, file-link, link)
+# 4. Test file uploads
+# 5. Test public/private visibility
+# 6. Test login/logout
+# 7. Test rerender functionality
+```
 
 ## Project Structure
 
