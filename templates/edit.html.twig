@@ -151,6 +151,13 @@
 
                 <div class="form-group">
                     <div class="checkbox-field">
+                        <input type="checkbox" id="files[{{ loop.index0 }}][unwrapped]" name="files[{{ loop.index0 }}][unwrapped]" value="1" {% if fileMeta.unwrapped %}checked{% endif %}>
+                        <label for="files[{{ loop.index0 }}][unwrapped]">Unwrapped (render without file header/wrapper)</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <div class="checkbox-field">
                         <input type="checkbox" id="files[{{ loop.index0 }}][collapsed]" name="files[{{ loop.index0 }}][collapsed]" value="1" {% if fileMeta.collapsed %}checked{% endif %}>
                         <label for="files[{{ loop.index0 }}][collapsed]">Start collapsed (multi-file mode)</label>
                     </div>
@@ -288,6 +295,13 @@ function addFile() {
             <div class="checkbox-field">
                 <input type="checkbox" id="files[${fileIndex}][hidden]" name="files[${fileIndex}][hidden]" value="1">
                 <label for="files[${fileIndex}][hidden]">Hidden (don't show in multi-file mode)</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${fileIndex}][unwrapped]" name="files[${fileIndex}][unwrapped]" value="1">
+                <label for="files[${fileIndex}][unwrapped]">Unwrapped (render without file header/wrapper)</label>
             </div>
         </div>
 

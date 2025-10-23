@@ -14,8 +14,6 @@
 {% endblock %}
 
 {% block content %}
-{% set isSingleFile = displayMode starts with 'single-' %}
-
 <header>
     <div>
         <h1>{% if not meta.public %}🔒 {% endif %}{{ meta.title }}</h1>
@@ -26,15 +24,15 @@
     </div>
 </header>
 
-{% if not isSingleFile and meta.description %}
+{% if meta.description %}
 <div class="description">
     {{ meta.description }}
 </div>
 {% endif %}
 
-{% if isSingleFile %}
-    {# Single file mode: just show the file content with optional description #}
-    {% for file in files %}
+{% for file in files %}
+    {% if file.meta.unwrapped %}
+        {# Unwrapped file: just show description + content (no wrapper/header) #}
         {% if file.meta.description %}
         <div class="description">
             {{ file.meta.description }}
@@ -42,45 +40,43 @@
         {% endif %}
 
         {{ file.renderedContent|raw }}
-    {% endfor %}
-{% else %}
-    {# Multi file mode: show each file in a section #}
-    {% for file in files %}
-    <div class="file-section {% if file.meta.collapsed %}collapsed{% endif %}" data-collapsed="{{ file.meta.collapsed ? 'true' : 'false' }}">
-        <div class="file-header" onclick="toggleFileSection(this)">
-            <div class="file-header-left">
-                <span class="collapse-icon">{% if file.meta.collapsed %}►︎{% else %}▼{% endif %}</span>
-                <h2>{{ file.meta.displayName|default(file.filename) }}</h2>
+    {% else %}
+        {# Wrapped file: show full file section with header #}
+        <div class="file-section {% if file.meta.collapsed %}collapsed{% endif %}" data-collapsed="{{ file.meta.collapsed ? 'true' : 'false' }}">
+            <div class="file-header" onclick="toggleFileSection(this)">
+                <div class="file-header-left">
+                    <span class="collapse-icon">{% if file.meta.collapsed %}►︎{% else %}▼{% endif %}</span>
+                    <h2>{{ file.meta.displayName|default(file.filename) }}</h2>
+                </div>
+                <div class="file-meta">
+                    {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
+                        Type: {{ file.meta.type }}
+                        {% if file.meta.render not in ['file-link'] %} | {% endif %}
+                    {% endif %}
+                    {% if file.meta.render not in ['file-link'] %}
+                        <a href="./files/{{ file.filename|url_encode }}" onclick="event.stopPropagation();">View</a>
+                    {% endif %}
+                </div>
             </div>
-            <div class="file-meta">
-                {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
-                    Type: {{ file.meta.type }}
-                    {% if file.meta.render not in ['file-link'] %} | {% endif %}
-                {% endif %}
-                {% if file.meta.render not in ['file-link'] %}
-                    <a href="./files/{{ file.filename|url_encode }}" onclick="event.stopPropagation();">View</a>
-                {% endif %}
+
+            {% if file.meta.collapsedDescription %}
+            <div class="file-collapsed-description">
+                <small><em>{{ file.meta.collapsedDescription }}</em></small>
             </div>
-        </div>
-
-        {% if file.meta.collapsedDescription %}
-        <div class="file-collapsed-description">
-            <small><em>{{ file.meta.collapsedDescription }}</em></small>
-        </div>
-        {% endif %}
-
-        <div class="file-body">
-            {% if file.meta.description %}
-            <p class="file-description">{{ file.meta.description }}</p>
             {% endif %}
 
-            <div class="file-content">
-                {{ file.renderedContent|raw }}
+            <div class="file-body">
+                {% if file.meta.description %}
+                <p class="file-description">{{ file.meta.description }}</p>
+                {% endif %}
+
+                <div class="file-content">
+                    {{ file.renderedContent|raw }}
+                </div>
             </div>
         </div>
-    </div>
-    {% endfor %}
-{% endif %}
+    {% endif %}
+{% endfor %}
 
 <footer>
     {% if meta.author %}

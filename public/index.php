@@ -78,6 +78,7 @@ function processFileData(int $index, array $fileData): array {
         'type' => $type,
         'render' => $render,
         'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
+        'unwrapped' => isset($fileData['unwrapped']) && $fileData['unwrapped'] === '1',
         'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
         'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
     ];

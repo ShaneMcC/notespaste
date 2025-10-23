@@ -34,6 +34,9 @@ class PasteRenderer
         // For single-file mode, only render the selected file
         if (str_starts_with($displayMode, 'single-') && $selectedFile && isset($files[$selectedFile])) {
             $fileMeta = $files[$selectedFile];
+            // Force unwrapped mode for single-file display
+            $fileMeta['unwrapped'] = true;
+
             $content = $this->paste->getFile($selectedFile);
             $renderedContent = $this->renderFileContent($selectedFile, $content, $fileMeta);
 
