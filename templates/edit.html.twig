@@ -82,6 +82,7 @@
                 </div>
 
                 <div class="file-editor-body">
+                <input type="hidden" name="files[{{ loop.index0 }}][originalFilename]" value="{{ filename }}">
                 <div class="inline-fields">
                     <div class="form-group">
                         <label>Filename</label>

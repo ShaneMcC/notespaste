@@ -248,6 +248,28 @@ class Paste
         $this->saveMeta();
     }
 
+    public function renameFile(string $oldFilename, string $newFilename): void
+    {
+        $oldPath = $this->basePath . '/files/' . $oldFilename;
+        $newPath = $this->basePath . '/files/' . $newFilename;
+
+        // Rename physical file
+        if (file_exists($oldPath)) {
+            if (!rename($oldPath, $newPath)) {
+                throw new \RuntimeException("Failed to rename file from {$oldFilename} to {$newFilename}");
+            }
+        }
+
+        // Update metadata - preserve file metadata under new filename
+        if (isset($this->meta['files'][$oldFilename])) {
+            $this->meta['files'][$newFilename] = $this->meta['files'][$oldFilename];
+            unset($this->meta['files'][$oldFilename]);
+        }
+
+        $this->meta['updatedAt'] = date('c');
+        $this->saveMeta();
+    }
+
     public function reorderFiles(array $orderedFilenames): void
     {
         $newFilesArray = [];

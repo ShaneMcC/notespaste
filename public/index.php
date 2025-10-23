@@ -129,6 +129,32 @@ $router->post('/notes/new', function() {
                 $render = $fileData['render'] ?? 'plain';
                 $type = $fileData['type'] ?? 'text';
 
+                // Check if file was uploaded
+                $content = null;
+                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
+                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
+                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
+
+                    // Auto-detect render mode for uploaded files if not already set to file/image modes
+                    if (!in_array($render, ['image', 'file', 'file-link'])) {
+                        $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
+
+                        // Check if it's an image
+                        if (strpos($mimeType, 'image/') === 0) {
+                            $render = 'image';
+                            $type = 'image';
+                        }
+                        // Check if it's binary (not text)
+                        elseif (strpos($mimeType, 'text/') !== 0 &&
+                                !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
+                            $render = 'file';
+                            $type = 'file';
+                        }
+                    }
+                } else {
+                    $content = $fileData['content'] ?? '';
+                }
+
                 // Override type for image/file/file-link/link render modes
                 if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
                     $type = $render;
@@ -143,14 +169,6 @@ $router->post('/notes/new', function() {
                     'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
                     'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
                 ];
-
-                // Check if file was uploaded
-                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
-                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
-                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
-                } else {
-                    $content = $fileData['content'] ?? '';
-                }
 
                 $paste->addFile($filename, $content, $fileMeta);
             }
@@ -209,22 +227,54 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
 
         // Track existing files to determine what to remove
         $existingFiles = array_keys($paste->getFiles());
-        $keptFiles = [];
+        $filesToRemove = [];
+        $filesToRename = []; // [originalFilename => newFilename]
+        $filesToUpdate = []; // [filename => [content, fileMeta]]
+        $filesToAdd = []; // [filename => [content, fileMeta]]
         $newFilesOrder = [];
 
-        // Handle file updates - build new ordered array
+        // First pass: collect all operations
         if (isset($_POST['files'])) {
+            $usedFilenames = [];
+
             foreach ($_POST['files'] as $index => $fileData) {
-                $filename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
+                $originalFilename = $fileData['originalFilename'] ?? null;
+                $newFilename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
 
                 // Check for duplicate filenames and add prefix if needed
-                if (in_array($filename, $keptFiles)) {
-                    $filename = "file{$index}_{$filename}";
+                if (in_array($newFilename, $usedFilenames)) {
+                    $newFilename = "file{$index}_{$newFilename}";
                 }
-                $keptFiles[] = $filename;
+                $usedFilenames[] = $newFilename;
 
                 $render = $fileData['render'] ?? 'plain';
                 $type = $fileData['type'] ?? 'text';
+
+                // Determine content
+                $content = null;
+                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
+                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
+                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
+
+                    // Auto-detect render mode for uploaded files if not already set to file/image modes
+                    if (!in_array($render, ['image', 'file', 'file-link'])) {
+                        $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
+
+                        // Check if it's an image
+                        if (strpos($mimeType, 'image/') === 0) {
+                            $render = 'image';
+                            $type = 'image';
+                        }
+                        // Check if it's binary (not text)
+                        elseif (strpos($mimeType, 'text/') !== 0 &&
+                                !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
+                            $render = 'file';
+                            $type = 'file';
+                        }
+                    }
+                } elseif (isset($fileData['content']) && $fileData['content'] !== '') {
+                    $content = $fileData['content'];
+                }
 
                 // Override type for image/file/file-link/link render modes
                 if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
@@ -241,32 +291,66 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
                     'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
                 ];
 
-                // Check if file was uploaded
-                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
-                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
-                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
-                } elseif (isset($fileData['content']) && $fileData['content'] !== '') {
-                    $content = $fileData['content'];
+                // Determine operation type
+                if ($originalFilename && in_array($originalFilename, $existingFiles)) {
+                    // Existing file
+                    if ($originalFilename !== $newFilename) {
+                        // Rename operation
+                        $filesToRename[$originalFilename] = $newFilename;
+                    }
+                    // Update/add to update list
+                    $filesToUpdate[$newFilename] = ['content' => $content, 'fileMeta' => $fileMeta, 'originalFilename' => $originalFilename];
                 } else {
-                    $content = null; // Keep existing content
+                    // New file
+                    $filesToAdd[$newFilename] = ['content' => $content ?? '', 'fileMeta' => $fileMeta];
                 }
 
-                if (in_array($filename, $existingFiles)) {
-                    $paste->updateFile($filename, $content, $fileMeta);
-                } else {
-                    $paste->addFile($filename, $content ?? '', $fileMeta);
-                }
-
-                // Store in new order
-                $newFilesOrder[] = $filename;
+                $newFilesOrder[] = $newFilename;
             }
         }
 
-        // Remove files that are no longer present
+        // Determine files to remove (existed before but not in form submission)
         foreach ($existingFiles as $existingFile) {
-            if (!in_array($existingFile, $keptFiles)) {
-                $paste->removeFile($existingFile);
+            $stillExists = false;
+            if (isset($_POST['files'])) {
+                foreach ($_POST['files'] as $fileData) {
+                    if (($fileData['originalFilename'] ?? null) === $existingFile) {
+                        $stillExists = true;
+                        break;
+                    }
+                }
             }
+            if (!$stillExists) {
+                $filesToRemove[] = $existingFile;
+            }
+        }
+
+        // Stage 1: Rename files to temporary names to avoid conflicts
+        $tempRenames = [];
+        foreach ($filesToRename as $oldName => $newName) {
+            $tempName = '__temp_' . uniqid() . '_' . $oldName;
+            $paste->renameFile($oldName, $tempName);
+            $tempRenames[$tempName] = $newName;
+        }
+
+        // Stage 2: Rename from temp names to final names
+        foreach ($tempRenames as $tempName => $finalName) {
+            $paste->renameFile($tempName, $finalName);
+        }
+
+        // Update file metadata and content
+        foreach ($filesToUpdate as $filename => $data) {
+            $paste->updateFile($filename, $data['content'], $data['fileMeta']);
+        }
+
+        // Add new files
+        foreach ($filesToAdd as $filename => $data) {
+            $paste->addFile($filename, $data['content'], $data['fileMeta']);
+        }
+
+        // Remove deleted files
+        foreach ($filesToRemove as $filename) {
+            $paste->removeFile($filename);
         }
 
         // Reorder files in metadata to match form submission order
