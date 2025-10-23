@@ -4,46 +4,10 @@ namespace App;
 
 class Helpers
 {
-    public static function getMimeType(string $filename): string
+    public static function getMimeType(string $filePath): string
     {
-        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-
-        $mimeTypes = [
-            // Text
-            'txt' => 'text/plain',
-            'md' => 'text/markdown',
-            'html' => 'text/html',
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'json' => 'application/json',
-            'xml' => 'application/xml',
-
-            // Programming languages
-            'php' => 'text/x-php',
-            'py' => 'text/x-python',
-            'rb' => 'text/x-ruby',
-            'java' => 'text/x-java',
-            'c' => 'text/x-c',
-            'cpp' => 'text/x-c++',
-            'sh' => 'text/x-shellscript',
-            'bash' => 'text/x-shellscript',
-
-            // Images
-            'jpg' => 'image/jpeg',
-            'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'svg' => 'image/svg+xml',
-            'webp' => 'image/webp',
-
-            // Documents
-            'pdf' => 'application/pdf',
-            'zip' => 'application/zip',
-            'tar' => 'application/x-tar',
-            'gz' => 'application/gzip',
-        ];
-
-        return $mimeTypes[$extension] ?? 'application/octet-stream';
+        $mimeType = mime_content_type($filePath);
+        return $mimeType !== false ? $mimeType : 'application/octet-stream';
     }
 
     public static function sanitizeFilename(string $filename): string

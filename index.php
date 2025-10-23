@@ -325,6 +325,70 @@ $router->post('/notes/rerender-all', function() use ($twig) {
     }
 });
 
+// Proxy individual files through PHP
+$router->get('/notes/([a-zA-Z0-9]+)/files/(.+)', function($id, $filename) {
+    if (!Paste::exists($id)) {
+        Helpers::show404();
+    }
+
+    $paste = new Paste($id);
+    $filePath = $paste->getFilePath($filename);
+
+    if (!$filePath) {
+        Helpers::show404();
+    }
+
+    // Get MIME type and serve the file
+    $mimeType = Helpers::getMimeType($filePath);
+    header('Content-Type: ' . $mimeType);
+    header('Content-Length: ' . filesize($filePath));
+
+    // Add Content-Disposition for non-text/non-image files when render mode is 'file'
+    $files = $paste->getFiles();
+    $fileMeta = $files[$filename] ?? [];
+
+    $isTextOrImage = str_starts_with($mimeType, 'text/') || str_starts_with($mimeType, 'image/');
+
+    if (($fileMeta['render'] ?? '') === 'file' && !$isTextOrImage) {
+        header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
+    }
+
+    readfile($filePath);
+    exit;
+});
+
+// Proxy rendered HTML through PHP
+$router->get('/notes/([a-zA-Z0-9]+)/([^/]+\.html)', function($id, $htmlFile) {
+    if (!Paste::exists($id)) {
+        Helpers::show404();
+    }
+
+    $paste = new Paste($id);
+    $htmlPath = $paste->getHtmlPath();
+    $slug = $paste->getSlug();
+    $expectedFile = $slug . '.html';
+
+    // Check if requesting the correct HTML file
+    if ($htmlFile !== $expectedFile) {
+        Helpers::redirect($paste->getHtmlUrl(), 301);
+    }
+
+    // Render if doesn't exist
+    if (!file_exists($htmlPath)) {
+        try {
+            $paste->render();
+        } catch (\Exception $e) {
+            error_log("Failed to render paste {$id}: " . $e->getMessage());
+            Helpers::show500();
+        }
+    }
+
+    // Serve the HTML file
+    header('Content-Type: text/html; charset=utf-8');
+    readfile($htmlPath);
+    exit;
+});
+
 // View rendered paste - catch-all for paste URLs
 $router->get('/notes/([a-zA-Z0-9]+)(/.*)?', function($id, $path = '') {
     if (!Paste::exists($id)) {
@@ -335,38 +399,14 @@ $router->get('/notes/([a-zA-Z0-9]+)(/.*)?', function($id, $path = '') {
     $slug = $paste->getSlug();
     $expectedPath = '/' . $slug . '.html';
 
-    // If not accessing the correct slug URL, redirect
+    // If not accessing the correct slug URL, redirect to it
+    // The HTML proxy route will handle rendering if needed
     if ($path !== $expectedPath) {
-        // Only redirect if we can render the file OR it already exists
-        // This prevents redirect loops when rendering fails
-        if (!file_exists($paste->getHtmlPath())) {
-            try {
-                $paste->render();
-            } catch (\Exception $e) {
-                // If we can't render, show 500 instead of redirecting
-                error_log("Failed to render paste {$id}: " . $e->getMessage());
-                Helpers::show500();
-            }
-        }
-
         Helpers::redirect($paste->getHtmlUrl(), 301);
     }
 
-    // We're on the correct path now - serve or render the HTML file
-    if (file_exists($paste->getHtmlPath())) {
-        readfile($paste->getHtmlPath());
-        exit;
-    }
-
-    // If HTML doesn't exist, try to render it
-    try {
-        $html = $paste->render();
-        echo $html;
-        exit;
-    } catch (\Exception $e) {
-        error_log("Failed to render paste {$id}: " . $e->getMessage());
-        Helpers::show500();
-    }
+    // Redirect to the HTML file (which will be served by Apache or the HTML proxy route)
+    Helpers::redirect($paste->getHtmlUrl(), 301);
 });
 
 // 404 for everything else
