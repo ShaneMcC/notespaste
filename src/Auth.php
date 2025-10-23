@@ -24,6 +24,31 @@ class Auth
 
     public static function authenticate(string $username, string $password): bool
     {
+        // First, check environment variable authentication
+        $envUser = getenv('AUTH_USER');
+        $envPasswordHash = getenv('AUTH_PASSWORD_HASH');
+        $envPassword = getenv('AUTH_PASSWORD');
+
+        if ($envUser && $username === $envUser) {
+            // Check if AUTH_PASSWORD_HASH is set (takes priority)
+            if ($envPasswordHash) {
+                if (password_verify($password, $envPasswordHash)) {
+                    self::$currentUser = $username;
+                    $_SESSION['username'] = $username;
+                    return true;
+                }
+            }
+            // Otherwise check AUTH_PASSWORD (plain text)
+            elseif ($envPassword) {
+                if ($password === $envPassword) {
+                    self::$currentUser = $username;
+                    $_SESSION['username'] = $username;
+                    return true;
+                }
+            }
+        }
+
+        // Then check .htpasswd file
         $htpasswdFile = self::$htpasswdPath ?? __DIR__ . '/../config/.htpasswd';
 
         if (!file_exists($htpasswdFile)) {

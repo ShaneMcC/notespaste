@@ -94,8 +94,45 @@ The application can be configured via environment variables or the `config/confi
 
 ### Environment Variables
 
+**File Paths:**
 - `HTPASSWD_PATH` - Path to .htpasswd file (default: `config/.htpasswd`)
 - `NOTES_DIR` - Path to notes storage directory (default: `public/notes`)
+
+**Authentication (optional):**
+- `AUTH_USER` - Username for environment-based authentication
+- `AUTH_PASSWORD_HASH` - Bcrypt password hash (recommended, takes priority over AUTH_PASSWORD)
+- `AUTH_PASSWORD` - Plain text password (simpler, less secure)
+
+### Authentication Methods
+
+The application supports two authentication methods that can be used together:
+
+1. **Environment Variables** (recommended for Docker):
+   ```bash
+   # Using bcrypt hash (secure)
+   docker run -d \
+     -e AUTH_USER=admin \
+     -e AUTH_PASSWORD_HASH='$2y$10$...' \
+     pastebin:latest
+
+   # Or using plain text password (simpler)
+   docker run -d \
+     -e AUTH_USER=admin \
+     -e AUTH_PASSWORD=mypassword \
+     pastebin:latest
+   ```
+
+   Generate a bcrypt hash with:
+   ```bash
+   php -r "echo password_hash('yourpassword', PASSWORD_BCRYPT);"
+   ```
+
+2. **.htpasswd File** (traditional method):
+   - Place bcrypt-hashed credentials in `config/.htpasswd`
+   - Format: `username:$2y$10$...` (one per line)
+   - Generate with: `htpasswd -nbB username password`
+
+Both methods can coexist - the application will check environment variables first, then fall back to the .htpasswd file.
 
 ### Example config/config.php
 
@@ -109,10 +146,11 @@ return [
 
 ## Default Credentials
 
+If using the included `.htpasswd.example`:
 - Username: `admin`
 - Password: `password123`
 
-**⚠️ Change these immediately after setup!**
+**⚠️ Change these immediately after setup or use environment variables instead!**
 
 ## Usage
 
