@@ -2,7 +2,20 @@
 
 A simple, file-based pastebin application built with PHP.
 
-## Features
+## ⚠ Note - AI Generated
+Most (Basically all) of this was written using Claude Code with heavy prompting and mostly passive supervision, however I have not vetted absolutely everything it has written.
+
+This was created to scratch a personal itch, not to be a shining example of good code, so AI was used to speed up the delivery.
+
+## Fixes / Improvements / Features / PRs
+
+I generally welcome fixes/improvements/features via PR as long as they allow the application to keep scratching the itch it was written for.
+
+I will generally look favourably upon PRs as long as they don't harm my personal use of the application or add things outside of the scope I have defined for it.
+
+Feel free to raise issues for things and I may in time decide to get to it.
+
+# Features
 
 - **File-based storage** - No database required
 - **Multi-file pastes** - Each paste can contain multiple files
