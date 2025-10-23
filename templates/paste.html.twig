@@ -67,7 +67,9 @@
 
             <div class="file-body">
                 {% if file.meta.description %}
-                <p class="file-description">{{ file.meta.description }}</p>
+                <div class="file-description-wrapper">
+                    <div class="file-description">{{ file.meta.description }}</div>
+                </div>
                 {% endif %}
 
                 <div class="file-content">

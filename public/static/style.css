@@ -280,10 +280,17 @@ pre code {
     border-bottom: 1px solid var(--border-dark);
 }
 
+.file-description-wrapper {
+    padding: 20px;
+}
+
 .file-description {
     color: var(--text-tertiary);
-    margin-bottom: 15px;
-    padding: 0 20px;
+    margin: 0;
+    padding: 15px;
+    background: var(--bg-hover);
+    border-left: 4px solid var(--link-color);
+    border-radius: 4px;
 }
 
 .file-content {
