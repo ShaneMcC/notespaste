@@ -6,6 +6,13 @@ Options -Indexes
 # Prevent access to _meta.json files
 RewriteRule ^notes/.*/_meta\.json$ - [F,L]
 
+# Disable execution of uploaded files to prevent code execution vulnerabilities
+# Covers PHP, CGI/Perl, Python, Ruby, SSI, shell scripts, and ASP
+<FilesMatch "\.(ph(p[3457]?|t|tml)|cgi|pl|py|rb|rhtml|shtml|shtm|sh|bash|asp|aspx)$">
+    SetHandler none
+    ForceType text/plain
+</FilesMatch>
+
 # Allow direct access to files in notes/*/files/ directories (must be actual files)
 RewriteCond %{REQUEST_FILENAME} -f
 RewriteCond %{REQUEST_URI} ^/notes/[^/]+/files/
