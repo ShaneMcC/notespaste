@@ -4,14 +4,25 @@ namespace App;
 
 class Paste
 {
+    private static ?string $notesDir = null;
     private string $id;
     private string $basePath;
     private array $meta;
 
+    public static function setNotesDir(string $dir): void
+    {
+        self::$notesDir = $dir;
+    }
+
+    private static function getNotesDir(): string
+    {
+        return self::$notesDir ?? __DIR__ . '/../public/notes';
+    }
+
     public function __construct(string $id)
     {
         $this->id = $id;
-        $this->basePath = __DIR__ . '/../notes/' . $id;
+        $this->basePath = self::getNotesDir() . '/' . $id;
         $this->loadMeta();
     }
 
@@ -30,13 +41,13 @@ class Paste
 
     public static function exists(string $id): bool
     {
-        $basePath = __DIR__ . '/../notes/' . $id;
+        $basePath = self::getNotesDir() . '/' . $id;
         return is_dir($basePath) && file_exists($basePath . '/_meta.json');
     }
 
     public static function listAll(bool $publicOnly = false): array
     {
-        $notesDir = __DIR__ . '/../notes';
+        $notesDir = self::getNotesDir();
         $pastes = [];
 
         if (!is_dir($notesDir)) {

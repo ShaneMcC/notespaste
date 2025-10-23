@@ -19,9 +19,7 @@ class PasteRenderer
         $loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
         $this->twig = new \Twig\Environment($loader);
 
-        // Add BASE_PATH as a global variable in Twig
-        $basePath = defined('BASE_PATH') ? BASE_PATH : '';
-        $this->twig->addGlobal('basePath', $basePath);
+        // Don't set basePath - let templates use relative paths via default filter
     }
 
     public function render(): string

@@ -5,9 +5,14 @@ namespace App;
 class Auth
 {
     private static ?string $currentUser = null;
+    private static ?string $htpasswdPath = null;
 
-    public static function init(): void
+    public static function init(string $htpasswdPath = null): void
     {
+        if ($htpasswdPath !== null) {
+            self::$htpasswdPath = $htpasswdPath;
+        }
+
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
@@ -19,7 +24,7 @@ class Auth
 
     public static function authenticate(string $username, string $password): bool
     {
-        $htpasswdFile = __DIR__ . '/../.htpasswd';
+        $htpasswdFile = self::$htpasswdPath ?? __DIR__ . '/../config/.htpasswd';
 
         if (!file_exists($htpasswdFile)) {
             return false;

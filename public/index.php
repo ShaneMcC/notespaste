@@ -1,13 +1,19 @@
 <?php
 
-require_once __DIR__ . '/vendor/autoload.php';
+// Load configuration
+$config = require __DIR__ . '/../config/config.php';
+
+require_once __DIR__ . '/../vendor/autoload.php';
 
 use App\Auth;
 use App\Paste;
 use App\Helpers;
 
 // Initialize authentication
-Auth::init();
+Auth::init($config['htpasswd_path']);
+
+// Initialize Paste with notes directory
+Paste::setNotesDir($config['notes_dir']);
 
 // Detect base path from the request URI
 $scriptPath = dirname($_SERVER['SCRIPT_NAME']);
@@ -23,7 +29,7 @@ $router = new \Bramus\Router\Router();
 $router->setBasePath($basePath);
 
 // Initialize Twig
-$loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/templates');
+$loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
 $twig = new \Twig\Environment($loader);
 
 // Add BASE_PATH as a global variable in Twig

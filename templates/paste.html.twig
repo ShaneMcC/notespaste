@@ -21,10 +21,8 @@
         <h1>{% if not meta.public %}🔒 {% endif %}{{ meta.title }}</h1>
     </div>
     <div class="nav">
-        <a href="{{ basePath }}/" class="button">Home</a>
-        {% if isLoggedIn %}
-            <a href="{{ basePath }}/notes/{{ paste.getId() }}/edit" class="button secondary">Edit</a>
-        {% endif %}
+        <a href="{{ basePath|default('../..') }}/" class="button">Home</a>
+        <a href="{{ basePath|default('../..') }}/notes/{{ paste.getId() }}/edit" class="button secondary">Edit</a>
     </div>
 </header>
 
