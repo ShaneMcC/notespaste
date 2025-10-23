@@ -432,6 +432,41 @@ footer {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
+    cursor: pointer;
+    user-select: none;
+    padding: 5px;
+    margin: -5px -5px 10px -5px;
+    border-radius: 4px;
+}
+
+.file-editor-header:hover {
+    background: var(--bg-hover);
+}
+
+.file-editor-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+}
+
+.file-editor-header-left h3 {
+    margin: 0;
+}
+
+.file-editor-names {
+    color: var(--text-tertiary);
+    font-size: 0.9em;
+}
+
+.file-hidden-indicator {
+    color: var(--text-muted);
+    font-size: 0.85em;
+    font-style: italic;
+}
+
+.file-editor.collapsed .file-editor-body {
+    display: none;
 }
 
 .inline-fields {

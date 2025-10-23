@@ -70,12 +70,17 @@
     <div id="files-container">
         {% if meta.files %}
             {% for filename, fileMeta in meta.files %}
-            <div class="file-editor" data-file-index="{{ loop.index0 }}">
-                <div class="file-editor-header">
-                    <h3>File #{{ loop.index }}</h3>
-                    <button type="button" class="secondary" onclick="removeFile(this)">Remove</button>
+            <div class="file-editor{% if meta.files|length > 1 %} collapsed{% endif %}" data-file-index="{{ loop.index0 }}">
+                <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
+                    <div class="file-editor-header-left">
+                        <span class="collapse-icon">{% if meta.files|length > 1 %}►︎{% else %}▼{% endif %}</span>
+                        <h3>File #{{ loop.index }}</h3>
+                        <span class="file-editor-names">{% if meta.files|length > 1 %} - {{ filename }}{% if fileMeta.displayName %} ({{ fileMeta.displayName }}){% endif %}{% if fileMeta.hidden %} <span class="file-hidden-indicator">[Hidden]</span>{% endif %}{% endif %}</span>
+                    </div>
+                    <button type="button" class="secondary" onclick="event.stopPropagation(); removeFile(this)">Remove</button>
                 </div>
 
+                <div class="file-editor-body"{% if meta.files|length > 1 %} style="display: none;"{% endif %}>
                 <div class="inline-fields">
                     <div class="form-group">
                         <label>Filename</label>
@@ -176,6 +181,7 @@
                     <label>Upload {% if fileMeta.render in ['image', 'file', 'file-link'] %}New {% endif %}File</label>
                     <input type="file" name="file_uploads[{{ loop.index0 }}]">
                 </div>
+                </div>
             </div>
             {% endfor %}
         {% endif %}
@@ -201,11 +207,16 @@ function addFile() {
     fileEditor.setAttribute('data-file-index', fileIndex);
 
     fileEditor.innerHTML = `
-        <div class="file-editor-header">
-            <h3>File #${fileIndex + 1}</h3>
-            <button type="button" class="secondary" onclick="removeFile(this)">Remove</button>
+        <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
+            <div class="file-editor-header-left">
+                <span class="collapse-icon">▼</span>
+                <h3>File #${fileIndex + 1}</h3>
+                <span class="file-editor-names"></span>
+            </div>
+            <button type="button" class="secondary" onclick="event.stopPropagation(); removeFile(this)">Remove</button>
         </div>
 
+        <div class="file-editor-body">
         <div class="inline-fields">
             <div class="form-group">
                 <label>Filename</label>
@@ -293,6 +304,7 @@ function addFile() {
             <label>Or Upload File</label>
             <input type="file" name="file_uploads[${fileIndex}]">
         </div>
+        </div>
     `;
 
     container.appendChild(fileEditor);
@@ -370,6 +382,45 @@ function updateDisplayModeFields() {
         selectedFileGroup.style.display = '';
     } else {
         selectedFileGroup.style.display = 'none';
+    }
+}
+
+function toggleFileEditor(event, header) {
+    const fileEditor = header.closest('.file-editor');
+    const icon = header.querySelector('.collapse-icon');
+    const body = fileEditor.querySelector('.file-editor-body');
+    const namesSpan = header.querySelector('.file-editor-names');
+
+    if (fileEditor.classList.contains('collapsed')) {
+        // Expand
+        fileEditor.classList.remove('collapsed');
+        icon.textContent = '▼';
+        body.style.display = '';
+        namesSpan.textContent = '';
+    } else {
+        // Collapse - show filename and display name
+        const filenameInput = fileEditor.querySelector('input[name*="[filename]"]');
+        const displayNameInput = fileEditor.querySelector('input[name*="[displayName]"]');
+        const hiddenCheckbox = fileEditor.querySelector('input[name*="[hidden]"]');
+
+        let names = '';
+        if (filenameInput && filenameInput.value) {
+            names = filenameInput.value;
+            if (displayNameInput && displayNameInput.value) {
+                names += ' (' + displayNameInput.value + ')';
+            }
+        }
+
+        // Add hidden indicator if checkbox is checked
+        let hiddenIndicator = '';
+        if (hiddenCheckbox && hiddenCheckbox.checked) {
+            hiddenIndicator = ' <span class="file-hidden-indicator">[Hidden]</span>';
+        }
+
+        fileEditor.classList.add('collapsed');
+        icon.textContent = '►︎';
+        body.style.display = 'none';
+        namesSpan.innerHTML = names ? ' - ' + names + hiddenIndicator : '';
     }
 }
 
