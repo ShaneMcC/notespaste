@@ -94,7 +94,7 @@
                         <select name="files[{{ loop.index0 }}][render]" class="render-select" onchange="updateFileFields(this)">
                             <option value="plain" {% if fileMeta.render == 'plain' %}selected{% endif %}>Plain</option>
                             <option value="highlighted" {% if fileMeta.render == 'highlighted' %}selected{% endif %}>Highlighted</option>
-                            <option value="rendered" {% if fileMeta.render == 'rendered' %}selected{% endif %}>Rendered</option>
+                            <option value="rendered" {% if fileMeta.render == 'rendered' %}selected{% endif %}>Rendered Markdown</option>
                             <option value="image" {% if fileMeta.render == 'image' %}selected{% endif %}>Image</option>
                             <option value="file" {% if fileMeta.render == 'file' %}selected{% endif %}>File Download</option>
                             <option value="file-link" {% if fileMeta.render == 'file-link' %}selected{% endif %}>File Link</option>
@@ -243,7 +243,7 @@ function addFile() {
                 <select name="files[${fileIndex}][render]" class="render-select" onchange="updateFileFields(this)">
                     <option value="plain">Plain</option>
                     <option value="highlighted" selected>Highlighted</option>
-                    <option value="rendered">Rendered</option>
+                    <option value="rendered">Rendered Markdown</option>
                     <option value="image">Image</option>
                     <option value="file">File Download</option>
                     <option value="file-link">File Link</option>
@@ -356,11 +356,15 @@ function updateFileFields(renderSelect) {
     const fileExistsIndicator = fileEditor.querySelector('.file-exists-indicator');
     const typeSelect = fileEditor.querySelector('.type-select');
 
-    // Hide type for image/file/file-link/link modes
-    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link') {
+    // Hide type for image/file/file-link/link/rendered modes
+    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link' || renderMode === 'rendered') {
         typeField.classList.add('hidden');
         // Set type to match render mode
-        typeSelect.value = renderMode;
+        if (renderMode === 'rendered') {
+            typeSelect.value = 'markdown';
+        } else {
+            typeSelect.value = renderMode;
+        }
     } else {
         typeField.classList.remove('hidden');
         // If current type value is not valid for this dropdown, reset to auto-detect
@@ -368,7 +372,7 @@ function updateFileFields(renderSelect) {
 
         // Check if the current value is one of the special render types that shouldn't be in the type dropdown
         // Also check for '' which happens when an invalid value was set (browser returns '' for invalid values)
-        if (['', 'image', 'file', 'file-link', 'link'].includes(currentValue)) {
+        if (['', 'image', 'file', 'file-link', 'link', 'markdown', 'rendered'].includes(currentValue)) {
             typeSelect.value = ''; // Reset to Auto-detect
         }
     }

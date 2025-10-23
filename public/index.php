@@ -67,9 +67,11 @@ function processFileData(int $index, array $fileData): array {
         $content = $fileData['content'];
     }
 
-    // Override type for image/file/file-link/link render modes
+    // Override type for image/file/file-link/link/rendered render modes
     if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
         $type = $render;
+    } elseif ($render === 'rendered') {
+        $type = 'markdown';
     }
 
     $fileMeta = [
