@@ -1,6 +1,6 @@
 # Pastebin Application
 
-A simple, file-based pastebin application built with PHP.
+A simple, file-based pastebin application built with PHP, in use at https://paste.s3e.uk/
 
 ## ⚠ Note - AI Generated
 Most (Basically all) of this was written using Claude Code with heavy prompting and mostly passive supervision, however I have not vetted absolutely everything it has written.
