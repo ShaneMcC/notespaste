@@ -25,9 +25,15 @@
     --button-primary-hover: #2980b9;
     --button-secondary: #95a5a6;
     --button-secondary-hover: #7f8c8d;
+    --button-text: white;
     --error-bg: #fadbd8;
     --error-color: #e74c3c;
+    --success-color: #22c55e;
     --shadow: rgba(0,0,0,0.1);
+    --code-bg: #f5f2f0;
+    --code-color: #c7254e;
+    --pre-bg: #2d2d2d;
+    --pre-color: #f8f8f2;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -52,9 +58,15 @@
         --button-primary-hover: #5dade2;
         --button-secondary: #5a6c7d;
         --button-secondary-hover: #6c7d8e;
+        --button-text: white;
         --error-bg: #4a2b2b;
         --error-color: #ff6b6b;
+        --success-color: #4ade80;
         --shadow: rgba(0,0,0,0.3);
+        --code-bg: #2a2a2a;
+        --code-color: #ff6b9d;
+        --pre-bg: #1a1a1a;
+        --pre-color: #f8f8f2;
     }
 }
 
@@ -119,7 +131,7 @@ a:hover {
 
 button, .button {
     background: var(--button-primary);
-    color: white;
+    color: var(--button-text);
     border: none;
     padding: 10px 20px;
     border-radius: 4px;
@@ -170,12 +182,13 @@ label {
 }
 
 pre {
-    background: #2d2d2d;
-    color: #f8f8f2;
+    background: var(--pre-bg);
+    color: var(--pre-color);
     padding: 15px;
     border-radius: 4px;
     overflow-x: auto;
     margin: 0;
+    border: 1px solid var(--border-primary);
 }
 
 /* Remove padding from pre when it contains code (highlight.js styling) */
@@ -183,18 +196,21 @@ pre:has(code) {
     padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-    pre {
-        background: #1a1a1a;
-        border: 1px solid var(--border-primary);
-    }
-}
-
 code {
     font-family: 'Courier New', monospace;
-    font-size: 0.9em;
+    background: var(--code-bg);
+    color: var(--code-color);
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+/* Only apply block styling to code inside pre */
+pre code {
     padding: 15px;
     display: block;
+    background: transparent;
+    color: inherit;
+    border-radius: 0;
 }
 
 .file-section {
@@ -217,12 +233,51 @@ code {
     padding: 0 20px;
     background: var(--bg-quaternary);
     border-bottom: 1px solid var(--border-dark);
+    cursor: pointer;
+}
+
+.file-header:hover {
+    background: var(--bg-hover);
+}
+
+.file-header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.collapse-icon {
+    font-size: 0.8em;
+    color: var(--text-tertiary);
+    min-width: 12px;
+    font-family: Arial, Helvetica, sans-serif;
 }
 
 .file-meta {
     font-size: 0.9em;
     color: var(--text-tertiary);
     white-space: nowrap;
+}
+
+.file-collapsed-description {
+    padding: 10px 20px;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-primary);
+    display: none;
+}
+
+.file-section.collapsed .file-collapsed-description {
+    display: block;
+}
+
+.file-section.collapsed .file-body {
+    display: none;
+}
+
+/* Collapsed sections keep border by default (for collapsed description) */
+.file-section.collapsed .file-header {
+    border-bottom: 1px solid var(--border-dark);
 }
 
 .file-description {
@@ -445,4 +500,34 @@ button, .button {
     line-height: 1.4;
     vertical-align: middle;
     box-sizing: border-box;
+}
+
+/* Success/error status indicators */
+.status-success {
+    color: var(--success-color);
+}
+
+.status-error {
+    color: var(--error-color);
+}
+
+/* Image preview in file editor */
+.file-image-preview {
+    margin-top: 10px;
+}
+
+.file-image-preview img {
+    max-width: 200px;
+    max-height: 200px;
+    border: 1px solid var(--border-secondary);
+    border-radius: 4px;
+}
+
+/* Hidden by default elements */
+.hidden {
+    display: none;
+}
+
+.inline-form {
+    display: inline;
 }

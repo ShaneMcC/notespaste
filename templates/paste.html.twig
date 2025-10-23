@@ -46,26 +46,37 @@
 {% else %}
     {# Multi file mode: show each file in a section #}
     {% for file in files %}
-    <div class="file-section">
-        <div class="file-header">
-            <h2>{{ file.meta.displayName|default(file.filename) }}</h2>
+    <div class="file-section {% if file.meta.collapsed %}collapsed{% endif %}" data-collapsed="{{ file.meta.collapsed ? 'true' : 'false' }}">
+        <div class="file-header" onclick="toggleFileSection(this)">
+            <div class="file-header-left">
+                <span class="collapse-icon">{% if file.meta.collapsed %}►︎{% else %}▼{% endif %}</span>
+                <h2>{{ file.meta.displayName|default(file.filename) }}</h2>
+            </div>
             <div class="file-meta">
                 {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
                     Type: {{ file.meta.type }}
                     {% if file.meta.render not in ['file-link'] %} | {% endif %}
                 {% endif %}
                 {% if file.meta.render not in ['file-link'] %}
-                    <a href="./files/{{ file.filename|url_encode }}">View</a>
+                    <a href="./files/{{ file.filename|url_encode }}" onclick="event.stopPropagation();">View</a>
                 {% endif %}
             </div>
         </div>
 
-        {% if file.meta.description %}
-        <p class="file-description">{{ file.meta.description }}</p>
+        {% if file.meta.collapsedDescription %}
+        <div class="file-collapsed-description">
+            <small><em>{{ file.meta.collapsedDescription }}</em></small>
+        </div>
         {% endif %}
 
-        <div class="file-content">
-            {{ file.renderedContent|raw }}
+        <div class="file-body">
+            {% if file.meta.description %}
+            <p class="file-description">{{ file.meta.description }}</p>
+            {% endif %}
+
+            <div class="file-content">
+                {{ file.renderedContent|raw }}
+            </div>
         </div>
     </div>
     {% endfor %}
@@ -91,5 +102,26 @@
             hljs.highlightElement(block);
         });
     });
+
+    function toggleFileSection(header) {
+        const section = header.closest('.file-section');
+        const icon = section.querySelector('.collapse-icon');
+        const body = section.querySelector('.file-body');
+        const collapsedDesc = section.querySelector('.file-collapsed-description');
+
+        if (section.classList.contains('collapsed')) {
+            // Expand
+            section.classList.remove('collapsed');
+            icon.textContent = '▼';
+            if (body) body.style.display = '';
+            if (collapsedDesc) collapsedDesc.style.display = 'none';
+        } else {
+            // Collapse
+            section.classList.add('collapsed');
+            icon.textContent = '►︎';
+            if (body) body.style.display = 'none';
+            if (collapsedDesc) collapsedDesc.style.display = '';
+        }
+    }
 </script>
 {% endblock %}

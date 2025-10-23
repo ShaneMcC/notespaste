@@ -21,9 +21,9 @@
             </div>
             <div class="paste-meta">
                 {% if result.success %}
-                    <span style="color: green;">✓ Success</span>
+                    <span class="status-success">✓ Success</span>
                 {% else %}
-                    <span style="color: red;">✗ Failed: {{ result.error }}</span>
+                    <span class="status-error">✗ Failed: {{ result.error }}</span>
                 {% endif %}
             </div>
         </div>

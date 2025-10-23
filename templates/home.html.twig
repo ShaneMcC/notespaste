@@ -8,7 +8,7 @@
     <div class="header-actions">
         {% if isLoggedIn %}
             <a href="{{ basePath }}/notes/new" class="button">New Paste</a>
-            <form method="post" action="{{ basePath }}/notes/rerender-all" style="display: inline;">
+            <form method="post" action="{{ basePath }}/notes/rerender-all" class="inline-form">
                 <button type="submit" class="button secondary">Rerender All</button>
             </form>
             <a href="{{ basePath }}/logout" class="button secondary">Logout</a>

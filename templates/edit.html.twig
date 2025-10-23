@@ -52,7 +52,7 @@
         </select>
     </div>
 
-    <div class="form-group" id="selectedFileGroup" style="display: none;">
+    <div class="form-group hidden" id="selectedFileGroup">
         <label for="selectedFile">Display File</label>
         <select id="selectedFile" name="selectedFile">
             {% if meta.files %}
@@ -142,19 +142,31 @@
                     </div>
                 </div>
 
+                <div class="form-group">
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="files[{{ loop.index0 }}][collapsed]" name="files[{{ loop.index0 }}][collapsed]" value="1" {% if fileMeta.collapsed %}checked{% endif %}>
+                        <label for="files[{{ loop.index0 }}][collapsed]">Start collapsed (multi-file mode)</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="files[{{ loop.index0 }}][collapsedDescription]">Collapsed Description (optional)</label>
+                    <input type="text" id="files[{{ loop.index0 }}][collapsedDescription]" name="files[{{ loop.index0 }}][collapsedDescription]" value="{{ fileMeta.collapsedDescription }}" placeholder="Brief description shown when collapsed">
+                </div>
+
                 <div class="form-group file-content-field">
                     <label>Content (or upload file below)</label>
                     <textarea name="files[{{ loop.index0 }}][content]" rows="10">{{ paste.getFile(filename) }}</textarea>
                 </div>
 
-                <div class="form-group file-exists-indicator" style="display: none;">
+                <div class="form-group file-exists-indicator hidden">
                     <label>Current File</label>
                     <div class="existing-file-info">
                         {% set isBinary = paste.isFileBinary(filename) %}
                         <strong>{{ filename }}</strong> {% if isBinary %}(binary file){% else %}exists{% endif %}
                         {% if fileMeta.render == 'image' %}
-                        <div style="margin-top: 10px;">
-                            <img src="{{ basePath }}/notes/{{ paste.id }}/files/{{ filename }}" style="max-width: 200px; max-height: 200px; border: 1px solid #ddd; border-radius: 4px;">
+                        <div class="file-image-preview">
+                            <img src="{{ basePath }}/notes/{{ paste.id }}/files/{{ filename }}">
                         </div>
                         {% endif %}
                     </div>
@@ -258,6 +270,18 @@ function addFile() {
                 <input type="checkbox" id="files[${fileIndex}][hidden]" name="files[${fileIndex}][hidden]" value="1">
                 <label for="files[${fileIndex}][hidden]">Hidden (don't show in multi-file mode)</label>
             </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${fileIndex}][collapsed]" name="files[${fileIndex}][collapsed]" value="1">
+                <label for="files[${fileIndex}][collapsed]">Start collapsed (multi-file mode)</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="files[${fileIndex}][collapsedDescription]">Collapsed Description (optional)</label>
+            <input type="text" id="files[${fileIndex}][collapsedDescription]" name="files[${fileIndex}][collapsedDescription]" placeholder="Brief description shown when collapsed">
         </div>
 
         <div class="form-group file-content-field">
