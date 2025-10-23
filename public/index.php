@@ -35,6 +35,61 @@ $twig = new \Twig\Environment($loader);
 // Add BASE_PATH as a global variable in Twig
 $twig->addGlobal('basePath', $basePath);
 
+// Helper function to process file data from form submission
+function processFileData(int $index, array $fileData): array {
+    $filename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
+    $render = $fileData['render'] ?? 'plain';
+    $type = $fileData['type'] ?? 'text';
+
+    // Check if file was uploaded
+    $content = null;
+    if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
+        $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
+        $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
+
+        // Auto-detect render mode for uploaded files if not already set to file/image modes
+        if (!in_array($render, ['image', 'file', 'file-link'])) {
+            $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
+
+            // Check if it's an image
+            if (strpos($mimeType, 'image/') === 0) {
+                $render = 'image';
+                $type = 'image';
+            }
+            // Check if it's binary (not text)
+            elseif (strpos($mimeType, 'text/') !== 0 &&
+                    !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
+                $render = 'file';
+                $type = 'file';
+            }
+        }
+    } elseif (isset($fileData['content']) && $fileData['content'] !== '') {
+        $content = $fileData['content'];
+    }
+
+    // Override type for image/file/file-link/link render modes
+    if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
+        $type = $render;
+    }
+
+    $fileMeta = [
+        'displayName' => $fileData['displayName'] ?? '',
+        'description' => $fileData['description'] ?? '',
+        'type' => $type,
+        'render' => $render,
+        'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
+        'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
+        'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
+    ];
+
+    return [
+        'filename' => $filename,
+        'content' => $content,
+        'fileMeta' => $fileMeta,
+        'originalFilename' => $fileData['originalFilename'] ?? null,
+    ];
+}
+
 // Home page - show public pastes for everyone, all pastes for logged in users
 $router->get('/', function() use ($twig) {
     $isLoggedIn = Auth::isLoggedIn();
@@ -118,7 +173,8 @@ $router->post('/notes/new', function() {
         $usedFilenames = [];
         if (isset($_POST['files'])) {
             foreach ($_POST['files'] as $index => $fileData) {
-                $filename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
+                $processed = processFileData($index, $fileData);
+                $filename = $processed['filename'];
 
                 // Check for duplicate filenames and add prefix if needed
                 if (in_array($filename, $usedFilenames)) {
@@ -126,51 +182,7 @@ $router->post('/notes/new', function() {
                 }
                 $usedFilenames[] = $filename;
 
-                $render = $fileData['render'] ?? 'plain';
-                $type = $fileData['type'] ?? 'text';
-
-                // Check if file was uploaded
-                $content = null;
-                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
-                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
-                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
-
-                    // Auto-detect render mode for uploaded files if not already set to file/image modes
-                    if (!in_array($render, ['image', 'file', 'file-link'])) {
-                        $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
-
-                        // Check if it's an image
-                        if (strpos($mimeType, 'image/') === 0) {
-                            $render = 'image';
-                            $type = 'image';
-                        }
-                        // Check if it's binary (not text)
-                        elseif (strpos($mimeType, 'text/') !== 0 &&
-                                !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
-                            $render = 'file';
-                            $type = 'file';
-                        }
-                    }
-                } else {
-                    $content = $fileData['content'] ?? '';
-                }
-
-                // Override type for image/file/file-link/link render modes
-                if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
-                    $type = $render;
-                }
-
-                $fileMeta = [
-                    'displayName' => $fileData['displayName'] ?? '',
-                    'description' => $fileData['description'] ?? '',
-                    'type' => $type,
-                    'render' => $render,
-                    'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
-                    'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
-                    'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
-                ];
-
-                $paste->addFile($filename, $content, $fileMeta);
+                $paste->addFile($filename, $processed['content'] ?? '', $processed['fileMeta']);
             }
         }
 
@@ -238,58 +250,15 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
             $usedFilenames = [];
 
             foreach ($_POST['files'] as $index => $fileData) {
-                $originalFilename = $fileData['originalFilename'] ?? null;
-                $newFilename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
+                $processed = processFileData($index, $fileData);
+                $originalFilename = $processed['originalFilename'];
+                $newFilename = $processed['filename'];
 
                 // Check for duplicate filenames and add prefix if needed
                 if (in_array($newFilename, $usedFilenames)) {
                     $newFilename = "file{$index}_{$newFilename}";
                 }
                 $usedFilenames[] = $newFilename;
-
-                $render = $fileData['render'] ?? 'plain';
-                $type = $fileData['type'] ?? 'text';
-
-                // Determine content
-                $content = null;
-                if (isset($_FILES['file_uploads']['tmp_name'][$index]) &&
-                    $_FILES['file_uploads']['error'][$index] === UPLOAD_ERR_OK) {
-                    $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
-
-                    // Auto-detect render mode for uploaded files if not already set to file/image modes
-                    if (!in_array($render, ['image', 'file', 'file-link'])) {
-                        $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
-
-                        // Check if it's an image
-                        if (strpos($mimeType, 'image/') === 0) {
-                            $render = 'image';
-                            $type = 'image';
-                        }
-                        // Check if it's binary (not text)
-                        elseif (strpos($mimeType, 'text/') !== 0 &&
-                                !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
-                            $render = 'file';
-                            $type = 'file';
-                        }
-                    }
-                } elseif (isset($fileData['content']) && $fileData['content'] !== '') {
-                    $content = $fileData['content'];
-                }
-
-                // Override type for image/file/file-link/link render modes
-                if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
-                    $type = $render;
-                }
-
-                $fileMeta = [
-                    'displayName' => $fileData['displayName'] ?? '',
-                    'description' => $fileData['description'] ?? '',
-                    'type' => $type,
-                    'render' => $render,
-                    'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
-                    'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
-                    'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
-                ];
 
                 // Determine operation type
                 if ($originalFilename && in_array($originalFilename, $existingFiles)) {
@@ -299,10 +268,10 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
                         $filesToRename[$originalFilename] = $newFilename;
                     }
                     // Update/add to update list
-                    $filesToUpdate[$newFilename] = ['content' => $content, 'fileMeta' => $fileMeta, 'originalFilename' => $originalFilename];
+                    $filesToUpdate[$newFilename] = ['content' => $processed['content'], 'fileMeta' => $processed['fileMeta'], 'originalFilename' => $originalFilename];
                 } else {
                     // New file
-                    $filesToAdd[$newFilename] = ['content' => $content ?? '', 'fileMeta' => $fileMeta];
+                    $filesToAdd[$newFilename] = ['content' => $processed['content'] ?? '', 'fileMeta' => $processed['fileMeta']];
                 }
 
                 $newFilesOrder[] = $newFilename;
