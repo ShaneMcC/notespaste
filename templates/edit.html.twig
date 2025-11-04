@@ -257,6 +257,14 @@
             <a href="{{ paste.getHtmlUrl() }}" class="button secondary">Cancel</a>
         {% endif %}
     </div>
+
+    {% if not isNew %}
+    <div class="danger-zone">
+        <h3>Danger Zone</h3>
+        <p>Deleting this paste will permanently remove it and all associated aliases. This action cannot be undone.</p>
+        <button type="button" class="button danger" onclick="deletePaste()">Delete Paste</button>
+    </div>
+    {% endif %}
 </form>
 
 <script>
@@ -696,6 +704,24 @@ function generatePasteId() {
         pasteId += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     pasteIdInput.value = pasteId;
+}
+
+// Delete paste with confirmation
+function deletePaste() {
+    const basePath = '{{ basePath }}';
+    const pasteId = '{{ paste.id }}';
+    const pasteTitle = '{{ meta.title|e('js') }}';
+
+    if (!confirm('Are you sure you want to delete "' + pasteTitle + '"?\n\nThis will permanently delete the paste and all its aliases. This action cannot be undone.')) {
+        return;
+    }
+
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = basePath + '/notes/' + pasteId + '/delete';
+    document.body.appendChild(form);
+    form.submit();
 }
 
 // Initialize field visibility on page load

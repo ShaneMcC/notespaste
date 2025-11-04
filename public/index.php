@@ -402,6 +402,28 @@ $router->get('/notes/?', function() {
     Helpers::redirect(BASE_PATH . '/');
 });
 
+// Delete paste
+$router->post('/notes/([a-zA-Z0-9_-]+)/delete', function($id) {
+    Auth::requireLogin();
+
+    // Resolve alias to real ID if needed
+    $realId = Paste::getRealId($id);
+
+    if (!Paste::exists($realId)) {
+        Helpers::show404();
+    }
+
+    try {
+        $paste = new Paste($realId);
+        $paste->delete();
+
+        Helpers::redirect(BASE_PATH . '/');
+    } catch (\Exception $e) {
+        error_log("Failed to delete paste {$realId}: " . $e->getMessage());
+        Helpers::show500();
+    }
+});
+
 // Generate a random alias ID (doesn't create it)
 $router->post('/notes/([a-zA-Z0-9_-]+)/alias/generate', function($id) {
     Auth::requireLogin();

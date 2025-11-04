@@ -607,4 +607,49 @@ class Paste
             }
         }
     }
+
+    /**
+     * Delete this paste and all its aliases
+     * @throws \RuntimeException if deletion fails
+     */
+    public function delete(): void
+    {
+        $notesDir = self::getNotesDir();
+
+        // Delete all alias directories first
+        foreach ($this->getAliases() as $aliasId) {
+            $aliasPath = $notesDir . '/' . $aliasId;
+            $this->deleteDirectory($aliasPath);
+        }
+
+        // Delete the main paste directory
+        $this->deleteDirectory($this->basePath);
+    }
+
+    /**
+     * Recursively delete a directory and all its contents
+     */
+    private function deleteDirectory(string $path): void
+    {
+        if (!is_dir($path)) {
+            return;
+        }
+
+        $items = scandir($path);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+
+            $itemPath = $path . '/' . $item;
+
+            if (is_dir($itemPath)) {
+                $this->deleteDirectory($itemPath);
+            } else {
+                @unlink($itemPath);
+            }
+        }
+
+        @rmdir($path);
+    }
 }
