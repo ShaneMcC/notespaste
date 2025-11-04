@@ -345,44 +345,45 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/edit', function($id) {
         // Reorder files in metadata to match form submission order
         $paste->reorderFiles($newFilesOrder);
 
-        // Check if we need to make an alias the primary ID
+        // Handle alias changes - order matters to avoid deleting IDs we need
+        $submittedAliases = isset($_POST['aliases']) ? array_filter($_POST['aliases']) : [];
+        $existingAliases = $paste->getAliases();
+        $currentPrimaryId = $paste->getId();
         $makePrimaryId = isset($_POST['make_primary_id']) && $_POST['make_primary_id'] !== '' ? $_POST['make_primary_id'] : null;
 
-        if ($makePrimaryId) {
-            // Make the alias primary (this swaps IDs and updates all aliases)
+        // Step 1: Add new aliases first (so they exist before we try to make one primary)
+        // Note: submittedAliases includes the current primary if user kept it in the form
+        foreach ($submittedAliases as $newAlias) {
+            // Skip if it's the current primary (not an alias yet) or already exists
+            if ($newAlias === $currentPrimaryId || in_array($newAlias, $existingAliases)) {
+                continue;
+            }
             try {
-                $paste->makePrimary($makePrimaryId);
-                // After making primary, the paste object's ID has changed
-                // The submitted aliases should already include the old ID as an alias
+                $paste->addAlias($newAlias);
             } catch (\Exception $e) {
-                error_log("Failed to make alias primary {$makePrimaryId}: " . $e->getMessage());
-                // Continue with normal save if makePrimary fails
+                error_log("Failed to add alias {$newAlias}: " . $e->getMessage());
             }
         }
 
-        // Handle alias changes (only if we didn't already handle them in makePrimary)
-        $submittedAliases = isset($_POST['aliases']) ? array_filter($_POST['aliases']) : [];
-        $existingAliases = $paste->getAliases();
+        // Step 2: Make primary swap if requested (this creates old primary as an alias)
+        if ($makePrimaryId && $makePrimaryId !== $currentPrimaryId) {
+            try {
+                $paste->makePrimary($makePrimaryId);
+                // After swap, paste ID changed and old ID is now an alias
+            } catch (\Exception $e) {
+                error_log("Failed to make alias primary {$makePrimaryId}: " . $e->getMessage());
+            }
+        }
 
-        // Remove aliases that are no longer in the list
-        foreach ($existingAliases as $existingAlias) {
+        // Step 3: Remove aliases that are no longer in the list
+        // (done AFTER primary swap so we don't delete the old primary before swapping)
+        $currentAliases = $paste->getAliases();
+        foreach ($currentAliases as $existingAlias) {
             if (!in_array($existingAlias, $submittedAliases)) {
                 try {
                     $paste->removeAlias($existingAlias);
                 } catch (\Exception $e) {
                     error_log("Failed to remove alias {$existingAlias}: " . $e->getMessage());
-                }
-            }
-        }
-
-        // Add new aliases
-        foreach ($submittedAliases as $newAlias) {
-            if (!in_array($newAlias, $existingAliases)) {
-                try {
-                    $paste->addAlias($newAlias);
-                } catch (\Exception $e) {
-                    error_log("Failed to add alias {$newAlias}: " . $e->getMessage());
-                    // Continue with other aliases even if one fails
                 }
             }
         }

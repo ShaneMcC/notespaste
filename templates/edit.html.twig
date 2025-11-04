@@ -255,16 +255,9 @@
         <button type="submit">Save Paste</button>
         {% if not isNew %}
             <a href="{{ paste.getHtmlUrl() }}" class="button secondary">Cancel</a>
+            <button type="button" class="button danger" onclick="deletePaste()">Delete Paste</button>
         {% endif %}
     </div>
-
-    {% if not isNew %}
-    <div class="danger-zone">
-        <h3>Danger Zone</h3>
-        <p>Deleting this paste will permanently remove it and all associated aliases. This action cannot be undone.</p>
-        <button type="button" class="button danger" onclick="deletePaste()">Delete Paste</button>
-    </div>
-    {% endif %}
 </form>
 
 <script>
