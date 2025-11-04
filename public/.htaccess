@@ -3,8 +3,9 @@ RewriteEngine On
 # Disable directory indexes globally
 Options -Indexes
 
-# Prevent access to _meta.json files
+# Prevent access to _meta.json and _alias.json files
 RewriteRule ^notes/.*/_meta\.json$ - [F,L]
+RewriteRule ^notes/.*/_alias\.json$ - [F,L]
 
 # Security: Force potentially executable files in notes/ through PHP proxy
 # This prevents direct execution while allowing safe serving via index.php

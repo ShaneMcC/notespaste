@@ -15,6 +15,18 @@
 </header>
 
 <form method="post" enctype="multipart/form-data" id="paste-form">
+    {% if isNew %}
+    <div class="form-group">
+        <label for="paste-id">Paste ID (optional)</label>
+        <div class="paste-id-input">
+            <input type="text" id="paste-id" name="paste_id" placeholder="Leave empty for random ID" pattern="[a-zA-Z0-9_-]+" title="Alphanumeric characters, hyphens, and underscores only">
+            <button type="button" class="secondary" onclick="generatePasteId()">Generate Random</button>
+        </div>
+        <small class="form-help">Alphanumeric characters, hyphens, and underscores. Leave empty to auto-generate.</small>
+        <div id="paste-id-error" class="alias-error" style="display: none;"></div>
+    </div>
+    {% endif %}
+
     <div class="form-group">
         <label for="title">Title</label>
         <input type="text" id="title" name="title" value="{{ meta.title }}" required>
@@ -41,6 +53,47 @@
             <label for="public">Public (visible to everyone)</label>
         </div>
     </div>
+
+    {% if not isNew %}
+    <div class="form-group">
+        <label>Paste IDs & Aliases</label>
+        <input type="hidden" id="make-primary-id" name="make_primary_id" value="">
+        <input type="hidden" id="original-primary-id" value="{{ paste.id }}">
+
+        <div id="aliases-container">
+            {# Primary ID first #}
+            <div class="alias-item primary-id" data-alias-id="{{ paste.id }}" data-is-primary="true">
+                <span class="primary-label">Primary:</span>
+                <code>{{ paste.id }}</code>
+                <input type="hidden" name="aliases[]" value="{{ paste.id }}">
+                <div class="alias-actions-buttons" style="display: none;">
+                    <button type="button" class="secondary small" onclick="makePrimaryAlias('{{ paste.id }}')">Make Primary</button>
+                    <button type="button" class="secondary small" onclick="removeAlias('{{ paste.id }}')">Remove</button>
+                </div>
+            </div>
+
+            {# Then all aliases #}
+            {% set aliases = paste.getAliases() %}
+            {% if aliases %}
+                {% for alias in aliases %}
+                <div class="alias-item" data-alias-id="{{ alias }}" data-is-primary="false">
+                    <code>{{ alias }}</code>
+                    <input type="hidden" name="aliases[]" value="{{ alias }}">
+                    <div class="alias-actions-buttons">
+                        <button type="button" class="secondary small" onclick="makePrimaryAlias('{{ alias }}')">Make Primary</button>
+                        <button type="button" class="secondary small" onclick="removeAlias('{{ alias }}')">Remove</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+        <div class="alias-actions">
+            <button type="button" class="secondary" onclick="addRandomAlias()">Add Random Alias</button>
+            <button type="button" class="secondary" onclick="addCustomAlias()">Add Custom Alias</button>
+        </div>
+        <div id="alias-error" class="alias-error" style="display: none;"></div>
+    </div>
+    {% endif %}
 
     <div class="form-group">
         <label for="displayMode">Display Mode</label>
@@ -633,6 +686,18 @@ function setupDragAndDrop(fileEditor) {
     }
 }
 
+// Paste ID management for new pastes
+function generatePasteId() {
+    const pasteIdInput = document.getElementById('paste-id');
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const length = 20 + Math.floor(Math.random() * 11); // 20-30 characters
+    let pasteId = '';
+    for (let i = 0; i < length; i++) {
+        pasteId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    pasteIdInput.value = pasteId;
+}
+
 // Initialize field visibility on page load
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.render-select').forEach(function(select) {
@@ -645,5 +710,196 @@ document.addEventListener('DOMContentLoaded', function() {
         setupDragAndDrop(fileEditor);
     });
 });
+
+// Alias management functions
+function addRandomAlias() {
+    const basePath = '{{ basePath }}';
+    const pasteId = '{{ paste.id }}';
+
+    // Call server to generate a unique ID
+    fetch(basePath + '/notes/' + pasteId + '/alias/generate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const aliasId = data.aliasId;
+
+            // Check if alias already exists in the list
+            if (aliasExistsInList(aliasId)) {
+                showAliasError('Alias ID already exists in the list');
+                return;
+            }
+
+            // Add to the list (will be saved on form submit)
+            addAliasToList(aliasId);
+        } else {
+            showAliasError(data.error || 'Failed to generate alias');
+        }
+    })
+    .catch(error => {
+        showAliasError('Network error: ' + error.message);
+    });
+}
+
+function addCustomAlias() {
+    const basePath = '{{ basePath }}';
+    const pasteId = '{{ paste.id }}';
+    const aliasId = prompt('Enter custom alias ID (alphanumeric, hyphens, and underscores):');
+
+    if (!aliasId) {
+        return; // User cancelled
+    }
+
+    // Validate with server
+    fetch(basePath + '/notes/' + pasteId + '/alias/validate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ aliasId: aliasId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Check if alias already exists in the list
+            if (aliasExistsInList(aliasId)) {
+                showAliasError('Alias ID already exists in the list');
+                return;
+            }
+
+            // Add to the list (will be saved on form submit)
+            addAliasToList(aliasId);
+        } else {
+            showAliasError(data.error || 'Invalid alias ID');
+        }
+    })
+    .catch(error => {
+        showAliasError('Network error: ' + error.message);
+    });
+}
+
+function removeAlias(aliasId) {
+    const container = document.getElementById('aliases-container');
+    const aliasItem = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    // Check if trying to remove the primary (should have buttons hidden, but just in case)
+    if (aliasItem && aliasItem.getAttribute('data-is-primary') === 'true') {
+        showAliasError('Cannot remove the primary ID. Make another ID primary first.');
+        return;
+    }
+
+    // Remove from the DOM (will be saved on form submit)
+    removeAliasFromList(aliasId);
+}
+
+function makePrimaryAlias(aliasId) {
+    const container = document.getElementById('aliases-container');
+
+    // Find the currently marked primary item
+    const currentPrimary = container.querySelector('[data-is-primary="true"]');
+
+    // Find the item to make primary
+    const newPrimary = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    if (!currentPrimary || !newPrimary) {
+        return;
+    }
+
+    // Set the hidden field to indicate which alias should become primary on save
+    document.getElementById('make-primary-id').value = aliasId;
+
+    // Update the current primary item
+    currentPrimary.setAttribute('data-is-primary', 'false');
+    currentPrimary.classList.remove('primary-id');
+    const currentPrimaryLabel = currentPrimary.querySelector('.primary-label');
+    if (currentPrimaryLabel) {
+        currentPrimaryLabel.remove();
+    }
+    // Show buttons on old primary
+    const currentButtons = currentPrimary.querySelector('.alias-actions-buttons');
+    if (currentButtons) {
+        currentButtons.style.display = 'flex';
+    }
+
+    // Update the new primary item
+    newPrimary.setAttribute('data-is-primary', 'true');
+    newPrimary.classList.add('primary-id');
+
+    // Add "Primary:" label if not exists
+    if (!newPrimary.querySelector('.primary-label')) {
+        const label = document.createElement('span');
+        label.className = 'primary-label';
+        label.textContent = 'Primary:';
+        newPrimary.insertBefore(label, newPrimary.firstChild);
+    }
+
+    // Hide buttons on new primary
+    const newButtons = newPrimary.querySelector('.alias-actions-buttons');
+    if (newButtons) {
+        newButtons.style.display = 'none';
+    }
+}
+
+function addAliasToList(aliasId) {
+    const container = document.getElementById('aliases-container');
+
+    // Create new alias item (always as non-primary)
+    const aliasItem = document.createElement('div');
+    aliasItem.className = 'alias-item';
+    aliasItem.setAttribute('data-alias-id', aliasId);
+    aliasItem.setAttribute('data-is-primary', 'false');
+    aliasItem.innerHTML = `
+        <code>${escapeHtml(aliasId)}</code>
+        <input type="hidden" name="aliases[]" value="${escapeHtml(aliasId)}">
+        <div class="alias-actions-buttons">
+            <button type="button" class="secondary small" onclick="makePrimaryAlias('${escapeHtml(aliasId)}')">Make Primary</button>
+            <button type="button" class="secondary small" onclick="removeAlias('${escapeHtml(aliasId)}')">Remove</button>
+        </div>
+    `;
+
+    container.appendChild(aliasItem);
+}
+
+function removeAliasFromList(aliasId) {
+    const container = document.getElementById('aliases-container');
+    const aliasItem = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    if (aliasItem) {
+        aliasItem.remove();
+    }
+
+    // If no more aliases, show "no aliases" message
+    if (container.children.length === 0) {
+        const noAliases = document.createElement('p');
+        noAliases.className = 'no-aliases';
+        noAliases.textContent = 'No aliases yet';
+        container.appendChild(noAliases);
+    }
+}
+
+function aliasExistsInList(aliasId) {
+    const container = document.getElementById('aliases-container');
+    return container.querySelector(`[data-alias-id="${aliasId}"]`) !== null;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showAliasError(message) {
+    const errorDiv = document.getElementById('alias-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
 </script>
 {% endblock %}

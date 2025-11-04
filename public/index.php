@@ -161,6 +161,7 @@ $router->post('/notes/new', function() {
 
     try {
         $data = [
+            'id' => $_POST['paste_id'] ?? '', // Custom paste ID (optional)
             'title' => $_POST['title'] ?? 'Untitled',
             'description' => $_POST['description'] ?? '',
             'summary' => $_POST['summary'] ?? '',
@@ -200,11 +201,19 @@ $router->post('/notes/new', function() {
 });
 
 // Edit paste
-$router->get('/notes/([a-zA-Z0-9]+)/edit', function($id) use ($twig) {
+$router->get('/notes/([a-zA-Z0-9_-]+)/edit', function($id) use ($twig) {
     Auth::requireLogin();
 
-    if (!Paste::exists($id)) {
+    // Resolve alias to real ID if needed
+    $realId = Paste::getRealId($id);
+
+    if (!Paste::exists($realId)) {
         Helpers::show404();
+    }
+
+    // If accessing via alias, redirect to real ID for editing
+    if ($realId !== $id) {
+        Helpers::redirect(BASE_PATH . '/notes/' . $realId . '/edit', 301);
     }
 
     $paste = new Paste($id);
@@ -218,11 +227,19 @@ $router->get('/notes/([a-zA-Z0-9]+)/edit', function($id) use ($twig) {
 });
 
 // Update paste handler
-$router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
+$router->post('/notes/([a-zA-Z0-9_-]+)/edit', function($id) {
     Auth::requireLogin();
 
-    if (!Paste::exists($id)) {
+    // Resolve alias to real ID if needed
+    $realId = Paste::getRealId($id);
+
+    if (!Paste::exists($realId)) {
         Helpers::show404();
+    }
+
+    // If submitting via alias, redirect to real ID
+    if ($realId !== $id) {
+        Helpers::redirect(BASE_PATH . '/notes/' . $realId . '/edit', 301);
     }
 
     try {
@@ -328,6 +345,48 @@ $router->post('/notes/([a-zA-Z0-9]+)/edit', function($id) {
         // Reorder files in metadata to match form submission order
         $paste->reorderFiles($newFilesOrder);
 
+        // Check if we need to make an alias the primary ID
+        $makePrimaryId = isset($_POST['make_primary_id']) && $_POST['make_primary_id'] !== '' ? $_POST['make_primary_id'] : null;
+
+        if ($makePrimaryId) {
+            // Make the alias primary (this swaps IDs and updates all aliases)
+            try {
+                $paste->makePrimary($makePrimaryId);
+                // After making primary, the paste object's ID has changed
+                // The submitted aliases should already include the old ID as an alias
+            } catch (\Exception $e) {
+                error_log("Failed to make alias primary {$makePrimaryId}: " . $e->getMessage());
+                // Continue with normal save if makePrimary fails
+            }
+        }
+
+        // Handle alias changes (only if we didn't already handle them in makePrimary)
+        $submittedAliases = isset($_POST['aliases']) ? array_filter($_POST['aliases']) : [];
+        $existingAliases = $paste->getAliases();
+
+        // Remove aliases that are no longer in the list
+        foreach ($existingAliases as $existingAlias) {
+            if (!in_array($existingAlias, $submittedAliases)) {
+                try {
+                    $paste->removeAlias($existingAlias);
+                } catch (\Exception $e) {
+                    error_log("Failed to remove alias {$existingAlias}: " . $e->getMessage());
+                }
+            }
+        }
+
+        // Add new aliases
+        foreach ($submittedAliases as $newAlias) {
+            if (!in_array($newAlias, $existingAliases)) {
+                try {
+                    $paste->addAlias($newAlias);
+                } catch (\Exception $e) {
+                    error_log("Failed to add alias {$newAlias}: " . $e->getMessage());
+                    // Continue with other aliases even if one fails
+                }
+            }
+        }
+
         // Re-render the paste
         $paste->render();
 
@@ -343,8 +402,71 @@ $router->get('/notes/?', function() {
     Helpers::redirect(BASE_PATH . '/');
 });
 
+// Generate a random alias ID (doesn't create it)
+$router->post('/notes/([a-zA-Z0-9_-]+)/alias/generate', function($id) {
+    Auth::requireLogin();
+    header('Content-Type: application/json');
+
+    // Resolve alias to real ID if needed
+    $realId = Paste::getRealId($id);
+
+    if (!Paste::exists($realId)) {
+        echo json_encode(['success' => false, 'error' => 'Paste not found']);
+        return;
+    }
+
+    try {
+        // Generate a unique ID without creating the alias
+        $aliasId = Paste::generateId();
+        echo json_encode(['success' => true, 'aliasId' => $aliasId]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+});
+
+// Validate an alias ID (doesn't create it)
+$router->post('/notes/([a-zA-Z0-9_-]+)/alias/validate', function($id) {
+    Auth::requireLogin();
+    header('Content-Type: application/json');
+
+    // Resolve alias to real ID if needed
+    $realId = Paste::getRealId($id);
+
+    if (!Paste::exists($realId)) {
+        echo json_encode(['success' => false, 'error' => 'Paste not found']);
+        return;
+    }
+
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($data['aliasId'])) {
+            echo json_encode(['success' => false, 'error' => 'Alias ID required']);
+            return;
+        }
+
+        $aliasId = $data['aliasId'];
+
+        // Validate format
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $aliasId)) {
+            echo json_encode(['success' => false, 'error' => 'Alias ID must contain only alphanumeric characters, hyphens, and underscores']);
+            return;
+        }
+
+        // Check if ID already exists
+        if (Paste::idExists($aliasId)) {
+            echo json_encode(['success' => false, 'error' => 'Alias ID already exists']);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'aliasId' => $aliasId]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+});
+
 // Rerender single paste
-$router->post('/notes/([a-zA-Z0-9]+)/rerender', function($id) {
+$router->post('/notes/([a-zA-Z0-9_-]+)/rerender', function($id) {
     Auth::requireLogin();
 
     if (!Paste::exists($id)) {
@@ -399,7 +521,15 @@ $router->post('/notes/rerender-all', function() use ($twig) {
 });
 
 // Proxy individual files through PHP
-$router->get('/notes/([a-zA-Z0-9]+)/files/(.+)', function($id, $filename) {
+$router->get('/notes/([a-zA-Z0-9_-]+)/files/(.+)', function($id, $filename) {
+    // Check if this is an alias and redirect to real ID
+    if (Paste::isAlias($id)) {
+        $realId = Paste::resolveAlias($id);
+        if ($realId) {
+            Helpers::redirect(BASE_PATH . '/notes/' . $realId . '/files/' . $filename, 301);
+        }
+    }
+
     if (!Paste::exists($id)) {
         Helpers::show404();
     }
@@ -431,7 +561,15 @@ $router->get('/notes/([a-zA-Z0-9]+)/files/(.+)', function($id, $filename) {
 });
 
 // Proxy rendered HTML through PHP
-$router->get('/notes/([a-zA-Z0-9]+)/([^/]+\.html)', function($id, $htmlFile) {
+$router->get('/notes/([a-zA-Z0-9_-]+)/([^/]+\.html)', function($id, $htmlFile) {
+    // Check if this is an alias and redirect to real ID
+    if (Paste::isAlias($id)) {
+        $realId = Paste::resolveAlias($id);
+        if ($realId) {
+            Helpers::redirect(BASE_PATH . '/notes/' . $realId . '/' . $htmlFile, 301);
+        }
+    }
+
     if (!Paste::exists($id)) {
         Helpers::show404();
     }
@@ -463,7 +601,16 @@ $router->get('/notes/([a-zA-Z0-9]+)/([^/]+\.html)', function($id, $htmlFile) {
 });
 
 // View rendered paste - catch-all for paste URLs
-$router->get('/notes/([a-zA-Z0-9]+)(/.*)?', function($id, $path = '') {
+$router->get('/notes/([a-zA-Z0-9_-]+)(/.*)?', function($id, $path = '') {
+    // Check if this is an alias and redirect to real ID
+    if (Paste::isAlias($id)) {
+        $realId = Paste::resolveAlias($id);
+        if ($realId) {
+            // Preserve the path in the redirect
+            Helpers::redirect(BASE_PATH . '/notes/' . $realId . $path, 301);
+        }
+    }
+
     if (!Paste::exists($id)) {
         Helpers::show404();
     }

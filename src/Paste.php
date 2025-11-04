@@ -30,19 +30,73 @@ class Paste
     {
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         $length = rand(20, 30);
-        $id = '';
 
-        for ($i = 0; $i < $length; $i++) {
-            $id .= $chars[rand(0, strlen($chars) - 1)];
+        // Retry up to 10 times to find a non-conflicting ID
+        for ($attempt = 0; $attempt < 10; $attempt++) {
+            $id = '';
+            for ($i = 0; $i < $length; $i++) {
+                $id .= $chars[rand(0, strlen($chars) - 1)];
+            }
+
+            // Check if ID is available (not a paste ID or alias)
+            if (!self::idExists($id)) {
+                return $id;
+            }
         }
 
-        return $id;
+        throw new \RuntimeException("Failed to generate unique ID after 10 attempts");
     }
 
+    /**
+     * Check if an ID exists as either a real paste or an alias
+     */
+    public static function idExists(string $id): bool
+    {
+        $basePath = self::getNotesDir() . '/' . $id;
+        return is_dir($basePath);
+    }
+
+    /**
+     * Check if an ID is a real paste (has _meta.json)
+     */
     public static function exists(string $id): bool
     {
         $basePath = self::getNotesDir() . '/' . $id;
         return is_dir($basePath) && file_exists($basePath . '/_meta.json');
+    }
+
+    /**
+     * Check if an ID is an alias (has _alias.json)
+     */
+    public static function isAlias(string $id): bool
+    {
+        $basePath = self::getNotesDir() . '/' . $id;
+        return is_dir($basePath) && file_exists($basePath . '/_alias.json');
+    }
+
+    /**
+     * Resolve an alias to its parent ID
+     * Returns null if not an alias
+     */
+    public static function resolveAlias(string $id): ?string
+    {
+        if (!self::isAlias($id)) {
+            return null;
+        }
+
+        $aliasFile = self::getNotesDir() . '/' . $id . '/_alias.json';
+        $data = json_decode(file_get_contents($aliasFile), true);
+        return $data['parent'] ?? null;
+    }
+
+    /**
+     * Get the real ID, resolving aliases if necessary
+     * Returns the same ID if it's not an alias
+     */
+    public static function getRealId(string $id): string
+    {
+        $realId = self::resolveAlias($id);
+        return $realId ?? $id;
     }
 
     public static function listAll(bool $publicOnly = false): array
@@ -102,7 +156,23 @@ class Paste
 
     public static function create(array $data): self
     {
-        $id = self::generateId();
+        // Use custom ID if provided, otherwise generate random
+        if (isset($data['id']) && $data['id'] !== '') {
+            $id = $data['id'];
+
+            // Validate custom ID
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $id)) {
+                throw new \RuntimeException("Paste ID must contain only alphanumeric characters, hyphens, and underscores");
+            }
+
+            // Check if ID already exists
+            if (self::idExists($id)) {
+                throw new \RuntimeException("Paste ID '{$id}' already exists");
+            }
+        } else {
+            $id = self::generateId();
+        }
+
         $paste = new self($id);
 
         if (!is_dir($paste->basePath)) {
@@ -124,6 +194,7 @@ class Paste
             'selectedFile' => $data['selectedFile'] ?? '',
             'createdAt' => date('c'),
             'updatedAt' => date('c'),
+            'aliases' => [],
             'files' => []
         ];
 
@@ -369,5 +440,171 @@ class Paste
         }
 
         return $html;
+    }
+
+    /**
+     * Get all aliases for this paste
+     */
+    public function getAliases(): array
+    {
+        return $this->meta['aliases'] ?? [];
+    }
+
+    /**
+     * Add a new alias to this paste
+     * @param string|null $aliasId If null, generates a random alias
+     * @return string The alias ID that was created
+     * @throws \RuntimeException if alias already exists or creation fails
+     */
+    public function addAlias(?string $aliasId = null): string
+    {
+        // Generate random alias if not provided
+        if ($aliasId === null) {
+            $aliasId = self::generateId();
+        } else {
+            // Validate user-provided alias
+            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $aliasId)) {
+                throw new \RuntimeException("Alias ID must contain only alphanumeric characters, hyphens, and underscores");
+            }
+
+            // Check if alias already exists
+            if (self::idExists($aliasId)) {
+                throw new \RuntimeException("Alias ID '$aliasId' already exists");
+            }
+        }
+
+        // Create alias directory
+        $aliasPath = self::getNotesDir() . '/' . $aliasId;
+        if (!@mkdir($aliasPath, 0755, true)) {
+            throw new \RuntimeException("Failed to create alias directory: {$aliasPath}");
+        }
+
+        // Create _alias.json file
+        $aliasData = ['parent' => $this->id];
+        $aliasFile = $aliasPath . '/_alias.json';
+        $result = @file_put_contents($aliasFile, json_encode($aliasData, JSON_PRETTY_PRINT));
+
+        if ($result === false) {
+            // Clean up directory if file creation failed
+            @rmdir($aliasPath);
+            throw new \RuntimeException("Failed to create alias file: {$aliasFile}");
+        }
+
+        // Add to metadata
+        if (!isset($this->meta['aliases'])) {
+            $this->meta['aliases'] = [];
+        }
+        $this->meta['aliases'][] = $aliasId;
+        $this->meta['updatedAt'] = date('c');
+        $this->saveMeta();
+
+        return $aliasId;
+    }
+
+    /**
+     * Remove an alias from this paste
+     * @throws \RuntimeException if alias removal fails
+     */
+    public function removeAlias(string $aliasId): void
+    {
+        // Check if this is actually an alias of this paste
+        if (!in_array($aliasId, $this->meta['aliases'] ?? [])) {
+            throw new \RuntimeException("Alias '$aliasId' is not associated with this paste");
+        }
+
+        // Remove alias directory and its contents
+        $aliasPath = self::getNotesDir() . '/' . $aliasId;
+        $aliasFile = $aliasPath . '/_alias.json';
+
+        if (file_exists($aliasFile)) {
+            @unlink($aliasFile);
+        }
+
+        if (is_dir($aliasPath)) {
+            @rmdir($aliasPath);
+        }
+
+        // Remove from metadata
+        $this->meta['aliases'] = array_values(array_filter(
+            $this->meta['aliases'] ?? [],
+            fn($id) => $id !== $aliasId
+        ));
+        $this->meta['updatedAt'] = date('c');
+        $this->saveMeta();
+    }
+
+    /**
+     * Make an alias the primary ID by swapping it with the current ID
+     * @param string $aliasId The alias to promote to primary
+     * @throws \RuntimeException if operation fails
+     */
+    public function makePrimary(string $aliasId): void
+    {
+        // Verify the alias exists and belongs to this paste
+        if (!in_array($aliasId, $this->meta['aliases'] ?? [])) {
+            throw new \RuntimeException("Alias '{$aliasId}' is not associated with this paste");
+        }
+
+        $oldId = $this->id;
+        $newId = $aliasId;
+        $notesDir = self::getNotesDir();
+
+        // Get all aliases (excluding the one we're promoting)
+        $otherAliases = array_values(array_filter(
+            $this->meta['aliases'] ?? [],
+            fn($id) => $id !== $aliasId
+        ));
+
+        // Step 1: Delete the alias directory (it's just a pointer)
+        $aliasPath = $notesDir . '/' . $aliasId;
+        $aliasFile = $aliasPath . '/_alias.json';
+        if (file_exists($aliasFile)) {
+            @unlink($aliasFile);
+        }
+        if (is_dir($aliasPath)) {
+            @rmdir($aliasPath);
+        }
+
+        // Step 2: Rename current paste directory to the new ID
+        $oldPath = $notesDir . '/' . $oldId;
+        $newPath = $notesDir . '/' . $newId;
+        if (!rename($oldPath, $newPath)) {
+            throw new \RuntimeException("Failed to rename paste directory from '{$oldId}' to '{$newId}'");
+        }
+
+        // Step 3: Update internal state
+        $this->id = $newId;
+        $this->basePath = $newPath;
+
+        // Step 4: Update metadata with new alias list (old ID becomes alias)
+        $this->meta['aliases'] = array_merge([$oldId], $otherAliases);
+        $this->meta['updatedAt'] = date('c');
+        $this->saveMeta();
+
+        // Step 5: Create alias directory for old ID pointing to new ID
+        $oldAliasPath = $notesDir . '/' . $oldId;
+        if (!@mkdir($oldAliasPath, 0755, true)) {
+            throw new \RuntimeException("Failed to create alias directory for old ID: {$oldAliasPath}");
+        }
+
+        $oldAliasFile = $oldAliasPath . '/_alias.json';
+        $aliasData = ['parent' => $newId];
+        $result = @file_put_contents($oldAliasFile, json_encode($aliasData, JSON_PRETTY_PRINT));
+
+        if ($result === false) {
+            @rmdir($oldAliasPath);
+            throw new \RuntimeException("Failed to create alias file for old ID: {$oldAliasFile}");
+        }
+
+        // Step 6: Update all other alias directories to point to new ID
+        foreach ($otherAliases as $otherAlias) {
+            $otherAliasPath = $notesDir . '/' . $otherAlias;
+            $otherAliasFile = $otherAliasPath . '/_alias.json';
+
+            if (file_exists($otherAliasFile)) {
+                $aliasData = ['parent' => $newId];
+                @file_put_contents($otherAliasFile, json_encode($aliasData, JSON_PRETTY_PRINT));
+            }
+        }
     }
 }
