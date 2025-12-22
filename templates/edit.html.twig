@@ -21,6 +21,7 @@
         <div class="paste-id-input">
             <input type="text" id="paste-id" name="paste_id" placeholder="Leave empty for random ID" pattern="[a-zA-Z0-9_-]+" title="Alphanumeric characters, hyphens, and underscores only">
             <button type="button" class="secondary" onclick="generatePasteId()">Generate Random</button>
+            <button type="button" class="secondary" onclick="generateReadablePasteId()">Generate Readable</button>
         </div>
         <small class="form-help">Alphanumeric characters, hyphens, and underscores. Leave empty to auto-generate.</small>
         <div id="paste-id-error" class="alias-error" style="display: none;"></div>
@@ -89,6 +90,7 @@
         </div>
         <div class="alias-actions">
             <button type="button" class="secondary" onclick="addRandomAlias()">Add Random Alias</button>
+            <button type="button" class="secondary" onclick="addReadableAlias()">Add Readable Alias</button>
             <button type="button" class="secondary" onclick="addCustomAlias()">Add Custom Alias</button>
         </div>
         <div id="alias-error" class="alias-error" style="display: none;"></div>
@@ -273,6 +275,7 @@
     </div>
 </form>
 
+<script src="https://cdn.jsdelivr.net/npm/@joaomoreno/unique-names-generator@5.2.0/dist/index.umd.js"></script>
 <script>
 let fileIndex = {{ meta.files|length }};
 
@@ -732,16 +735,95 @@ function setupDragAndDrop(fileEditor) {
     }
 }
 
-// Paste ID management for new pastes
-function generatePasteId() {
-    const pasteIdInput = document.getElementById('paste-id');
+// ID generation utilities
+function generateRandomId() {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     const length = 20 + Math.floor(Math.random() * 11); // 20-30 characters
-    let pasteId = '';
+    let id = '';
     for (let i = 0; i < length; i++) {
-        pasteId += chars.charAt(Math.floor(Math.random() * chars.length));
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
     }
-    pasteIdInput.value = pasteId;
+    return id;
+}
+
+function generateReadableId() {
+    const { uniqueNamesGenerator: generate, adjectives, colors, animals } = uniqueNamesGenerator;
+    return generate({
+        dictionaries: [adjectives, colors, animals],
+        separator: '-',
+        style: 'lowerCase'
+    });
+}
+
+// Generate and validate a unique ID
+// type: 'random' or 'readable'
+// existsLocally: optional function to check if ID exists in local list (for aliases)
+// maxAttempts: number of retries before failing (default 10)
+// Returns: { success: true, id: string } or { success: false, error: string }
+async function generateValidId(type, existsLocally = null, maxAttempts = 10) {
+    const basePath = '{{ basePath }}';
+    const generator = type === 'readable' ? generateReadableId : generateRandomId;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const candidateId = generator();
+
+        // Check local list first if provided
+        if (existsLocally && existsLocally(candidateId)) {
+            continue;
+        }
+
+        try {
+            const response = await fetch(basePath + '/notes/new/id/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pasteId: candidateId })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                return { success: true, id: candidateId };
+            }
+            // ID exists on server, try again
+        } catch (error) {
+            // Network error - return the ID anyway, server will validate on submit
+            return { success: true, id: candidateId };
+        }
+    }
+
+    return { success: false, error: `Failed to generate unique ${type} ID after ${maxAttempts} attempts` };
+}
+
+// Paste ID field helpers
+async function generatePasteId() {
+    const result = await generateValidId('random');
+    const input = document.getElementById('paste-id');
+    const errorDiv = document.getElementById('paste-id-error');
+
+    if (result.success) {
+        input.value = result.id;
+        if (errorDiv) errorDiv.style.display = 'none';
+    } else {
+        if (errorDiv) {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+async function generateReadablePasteId() {
+    const result = await generateValidId('readable');
+    const input = document.getElementById('paste-id');
+    const errorDiv = document.getElementById('paste-id-error');
+
+    if (result.success) {
+        input.value = result.id;
+        if (errorDiv) errorDiv.style.display = 'none';
+    } else {
+        if (errorDiv) {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    }
 }
 
 // Delete paste with confirmation
@@ -776,43 +858,26 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Alias management functions
-function addRandomAlias() {
-    const basePath = '{{ basePath }}';
-    const pasteId = '{{ paste.id }}';
+async function addRandomAlias() {
+    const result = await generateValidId('random', aliasExistsInList);
+    if (result.success) {
+        addAliasToList(result.id);
+    } else {
+        showAliasError(result.error);
+    }
+}
 
-    // Call server to generate a unique ID
-    fetch(basePath + '/notes/' + pasteId + '/alias/generate', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({})
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            const aliasId = data.aliasId;
-
-            // Check if alias already exists in the list
-            if (aliasExistsInList(aliasId)) {
-                showAliasError('Alias ID already exists in the list');
-                return;
-            }
-
-            // Add to the list (will be saved on form submit)
-            addAliasToList(aliasId);
-        } else {
-            showAliasError(data.error || 'Failed to generate alias');
-        }
-    })
-    .catch(error => {
-        showAliasError('Network error: ' + error.message);
-    });
+async function addReadableAlias() {
+    const result = await generateValidId('readable', aliasExistsInList);
+    if (result.success) {
+        addAliasToList(result.id);
+    } else {
+        showAliasError(result.error);
+    }
 }
 
 function addCustomAlias() {
     const basePath = '{{ basePath }}';
-    const pasteId = '{{ paste.id }}';
     const aliasId = prompt('Enter custom alias ID (alphanumeric, hyphens, and underscores):');
 
     if (!aliasId) {
@@ -820,12 +885,12 @@ function addCustomAlias() {
     }
 
     // Validate with server
-    fetch(basePath + '/notes/' + pasteId + '/alias/validate', {
+    fetch(basePath + '/notes/new/id/validate', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ aliasId: aliasId })
+        body: JSON.stringify({ pasteId: aliasId })
     })
     .then(response => response.json())
     .then(data => {

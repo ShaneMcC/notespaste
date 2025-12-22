@@ -202,6 +202,39 @@ $router->post('/notes/new', function() {
     }
 });
 
+// Validate a paste ID (before creation)
+$router->post('/notes/new/id/validate', function() {
+    Auth::requireLogin();
+    header('Content-Type: application/json');
+
+    try {
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($data['pasteId'])) {
+            echo json_encode(['success' => false, 'error' => 'Paste ID required']);
+            return;
+        }
+
+        $pasteId = $data['pasteId'];
+
+        // Validate format
+        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $pasteId)) {
+            echo json_encode(['success' => false, 'error' => 'Paste ID must contain only alphanumeric characters, hyphens, and underscores']);
+            return;
+        }
+
+        // Check if ID already exists
+        if (Paste::idExists($pasteId)) {
+            echo json_encode(['success' => false, 'error' => 'Paste ID already exists']);
+            return;
+        }
+
+        echo json_encode(['success' => true, 'pasteId' => $pasteId]);
+    } catch (\Exception $e) {
+        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    }
+});
+
 // Edit paste
 $router->get('/notes/([a-zA-Z0-9_-]+)/edit', function($id) use ($twig) {
     Auth::requireLogin();
@@ -424,69 +457,6 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/delete', function($id) {
     } catch (\Exception $e) {
         error_log("Failed to delete paste {$realId}: " . $e->getMessage());
         Helpers::show500();
-    }
-});
-
-// Generate a random alias ID (doesn't create it)
-$router->post('/notes/([a-zA-Z0-9_-]+)/alias/generate', function($id) {
-    Auth::requireLogin();
-    header('Content-Type: application/json');
-
-    // Resolve alias to real ID if needed
-    $realId = Paste::getRealId($id);
-
-    if (!Paste::exists($realId)) {
-        echo json_encode(['success' => false, 'error' => 'Paste not found']);
-        return;
-    }
-
-    try {
-        // Generate a unique ID without creating the alias
-        $aliasId = Paste::generateId();
-        echo json_encode(['success' => true, 'aliasId' => $aliasId]);
-    } catch (\Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-    }
-});
-
-// Validate an alias ID (doesn't create it)
-$router->post('/notes/([a-zA-Z0-9_-]+)/alias/validate', function($id) {
-    Auth::requireLogin();
-    header('Content-Type: application/json');
-
-    // Resolve alias to real ID if needed
-    $realId = Paste::getRealId($id);
-
-    if (!Paste::exists($realId)) {
-        echo json_encode(['success' => false, 'error' => 'Paste not found']);
-        return;
-    }
-
-    try {
-        $data = json_decode(file_get_contents('php://input'), true);
-
-        if (!isset($data['aliasId'])) {
-            echo json_encode(['success' => false, 'error' => 'Alias ID required']);
-            return;
-        }
-
-        $aliasId = $data['aliasId'];
-
-        // Validate format
-        if (!preg_match('/^[a-zA-Z0-9_-]+$/', $aliasId)) {
-            echo json_encode(['success' => false, 'error' => 'Alias ID must contain only alphanumeric characters, hyphens, and underscores']);
-            return;
-        }
-
-        // Check if ID already exists
-        if (Paste::idExists($aliasId)) {
-            echo json_encode(['success' => false, 'error' => 'Alias ID already exists']);
-            return;
-        }
-
-        echo json_encode(['success' => true, 'aliasId' => $aliasId]);
-    } catch (\Exception $e) {
-        echo json_encode(['success' => false, 'error' => $e->getMessage()]);
     }
 });
 
