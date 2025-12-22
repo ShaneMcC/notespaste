@@ -93,11 +93,18 @@
 
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.8.0/highlightjs-line-numbers.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Only highlight code blocks with language-* class
         document.querySelectorAll('pre code[class*="language-"]').forEach(function(block) {
             hljs.highlightElement(block);
+
+            // Add line numbers if the pre has the line-numbers class
+            if (block.parentElement.classList.contains('line-numbers')) {
+                const startFrom = parseInt(block.parentElement.dataset.lnStartFrom) || 1;
+                hljs.lineNumbersBlock(block, { startFrom: startFrom, singleLine: true });
+            }
         });
     });
 

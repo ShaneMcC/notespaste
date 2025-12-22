@@ -83,6 +83,8 @@ function processFileData(int $index, array $fileData): array {
         'unwrapped' => isset($fileData['unwrapped']) && $fileData['unwrapped'] === '1',
         'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
         'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
+        'lineNumbers' => isset($fileData['lineNumbers']) && $fileData['lineNumbers'] === '1',
+        'lineNumberStart' => (int)($fileData['lineNumberStart'] ?? 1) ?: 1,
     ];
 
     return [

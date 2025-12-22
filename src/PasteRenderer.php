@@ -89,7 +89,10 @@ class PasteRenderer
 
             case 'highlighted':
                 $type = $fileMeta['type'] ?? 'text';
-                return '<pre><code class="language-' . htmlspecialchars($type) . '">' .
+                $lineNumbersClass = !empty($fileMeta['lineNumbers']) ? ' line-numbers' : '';
+                $lineNumberStart = (int)($fileMeta['lineNumberStart'] ?? 1) ?: 1;
+                $dataAttr = $lineNumberStart !== 1 ? ' data-ln-start-from="' . $lineNumberStart . '"' : '';
+                return '<pre class="hljs-pre' . $lineNumbersClass . '"' . $dataAttr . '><code class="language-' . htmlspecialchars($type) . '">' .
                     htmlspecialchars($content) . '</code></pre>';
 
             case 'image':

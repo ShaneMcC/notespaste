@@ -216,6 +216,19 @@
                     </div>
                 </div>
 
+                <div class="form-group file-line-numbers-field{% if fileMeta.render != 'highlighted' %} hidden{% endif %}">
+                    <div class="line-numbers-row">
+                        <div class="checkbox-field">
+                            <input type="checkbox" id="files[{{ loop.index0 }}][lineNumbers]" name="files[{{ loop.index0 }}][lineNumbers]" value="1" {% if fileMeta.lineNumbers %}checked{% endif %} onchange="toggleLineNumberStart(this)">
+                            <label for="files[{{ loop.index0 }}][lineNumbers]">Show line numbers</label>
+                        </div>
+                        <div class="line-number-start{% if not fileMeta.lineNumbers %} hidden{% endif %}">
+                            <label for="files[{{ loop.index0 }}][lineNumberStart]">Start from:</label>
+                            <input type="number" id="files[{{ loop.index0 }}][lineNumberStart]" name="files[{{ loop.index0 }}][lineNumberStart]" value="{{ fileMeta.lineNumberStart|default(1) }}" min="1">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label for="files[{{ loop.index0 }}][collapsedDescription]">Collapsed Description (optional)</label>
                     <input type="text" id="files[{{ loop.index0 }}][collapsedDescription]" name="files[{{ loop.index0 }}][collapsedDescription]" value="{{ fileMeta.collapsedDescription }}" placeholder="Brief description shown when collapsed">
@@ -366,6 +379,19 @@ function addFile() {
             </div>
         </div>
 
+        <div class="form-group file-line-numbers-field">
+            <div class="line-numbers-row">
+                <div class="checkbox-field">
+                    <input type="checkbox" id="files[${fileIndex}][lineNumbers]" name="files[${fileIndex}][lineNumbers]" value="1" onchange="toggleLineNumberStart(this)">
+                    <label for="files[${fileIndex}][lineNumbers]">Show line numbers</label>
+                </div>
+                <div class="line-number-start hidden">
+                    <label for="files[${fileIndex}][lineNumberStart]">Start from:</label>
+                    <input type="number" id="files[${fileIndex}][lineNumberStart]" name="files[${fileIndex}][lineNumberStart]" value="1" min="1">
+                </div>
+            </div>
+        </div>
+
         <div class="form-group">
             <label for="files[${fileIndex}][collapsedDescription]">Collapsed Description (optional)</label>
             <input type="text" id="files[${fileIndex}][collapsedDescription]" name="files[${fileIndex}][collapsedDescription]" placeholder="Brief description shown when collapsed">
@@ -412,6 +438,7 @@ function updateFileFields(renderSelect) {
     const contentField = fileEditor.querySelector('.file-content-field');
     const fileExistsIndicator = fileEditor.querySelector('.file-exists-indicator');
     const typeSelect = fileEditor.querySelector('.type-select');
+    const lineNumbersField = fileEditor.querySelector('.file-line-numbers-field');
 
     // Hide type for image/file/file-link/link/rendered modes
     if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link' || renderMode === 'rendered') {
@@ -461,6 +488,24 @@ function updateFileFields(renderSelect) {
         if (fileExistsIndicator) {
             fileExistsIndicator.classList.add('hidden');
         }
+    }
+
+    // Show line numbers option only for highlighted mode
+    if (lineNumbersField) {
+        if (renderMode === 'highlighted') {
+            lineNumbersField.classList.remove('hidden');
+        } else {
+            lineNumbersField.classList.add('hidden');
+        }
+    }
+}
+
+function toggleLineNumberStart(checkbox) {
+    const startField = checkbox.closest('.line-numbers-row').querySelector('.line-number-start');
+    if (checkbox.checked) {
+        startField.classList.remove('hidden');
+    } else {
+        startField.classList.add('hidden');
     }
 }
 

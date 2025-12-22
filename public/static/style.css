@@ -211,6 +211,56 @@ pre code {
     border-radius: 0;
 }
 
+/* Line numbers for code blocks (highlightjs-line-numbers plugin) */
+.hljs-ln {
+    border-collapse: collapse;
+}
+
+.hljs-ln td {
+    padding: 0;
+}
+
+.hljs-ln-numbers {
+    user-select: none;
+    text-align: right;
+    color: var(--text-muted);
+    border-right: 1px solid var(--border-primary);
+    vertical-align: top;
+    padding-right: 12px !important;
+    padding-left: 15px !important;
+}
+
+.hljs-ln-code {
+    padding-left: 12px !important;
+}
+
+/* Line numbers form row */
+.line-numbers-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.line-numbers-row .checkbox-field {
+    flex: 0 0 auto;
+}
+
+.line-number-start {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.line-number-start label {
+    margin: 0;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+.line-number-start input[type="number"] {
+    width: 80px;
+}
+
 .file-section {
     border: 1px solid var(--border-primary);
     border-radius: 6px;
