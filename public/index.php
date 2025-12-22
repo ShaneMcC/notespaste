@@ -8,6 +8,8 @@ require_once __DIR__ . '/../vendor/autoload.php';
 use App\Auth;
 use App\Paste;
 use App\Helpers;
+use App\Csrf;
+use App\TwigFactory;
 
 // Initialize authentication
 Auth::init($config['htpasswd_path']);
@@ -28,12 +30,9 @@ $router = new \Bramus\Router\Router();
 // Set base path
 $router->setBasePath($basePath);
 
-// Initialize Twig
-$loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
-$twig = new \Twig\Environment($loader);
-
-// Add BASE_PATH as a global variable in Twig
-$twig->addGlobal('basePath', $basePath);
+// Initialize Twig with basePath and CSRF token
+$twig = TwigFactory::create($basePath);
+$twig->addGlobal('csrfToken', Csrf::getToken());
 
 // Helper function to process file data from form submission
 function processFileData(int $index, array $fileData): array {
@@ -49,7 +48,8 @@ function processFileData(int $index, array $fileData): array {
 
         // Auto-detect render mode for uploaded files if not already set to file/image modes
         if (!in_array($render, ['image', 'file', 'file-link'])) {
-            $mimeType = mime_content_type($_FILES['file_uploads']['tmp_name'][$index]);
+            $finfo = new \finfo(FILEINFO_MIME_TYPE);
+            $mimeType = $finfo->file($_FILES['file_uploads']['tmp_name'][$index]);
 
             // Check if it's an image
             if (strpos($mimeType, 'image/') === 0) {
@@ -123,6 +123,8 @@ $router->get('/login', function() use ($twig) {
 
 // Login handler
 $router->post('/login', function() {
+    Csrf::requireValidToken();
+
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
 
@@ -160,6 +162,7 @@ $router->get('/notes/new', function() use ($twig) {
 // Create paste handler
 $router->post('/notes/new', function() {
     Auth::requireLogin();
+    Csrf::requireValidToken();
 
     try {
         $data = [
@@ -202,7 +205,7 @@ $router->post('/notes/new', function() {
     }
 });
 
-// Validate a paste ID (before creation)
+// Validate a paste ID (before creation) - read-only check, no CSRF needed
 $router->post('/notes/new/id/validate', function() {
     Auth::requireLogin();
     header('Content-Type: application/json');
@@ -264,6 +267,7 @@ $router->get('/notes/([a-zA-Z0-9_-]+)/edit', function($id) use ($twig) {
 // Update paste handler
 $router->post('/notes/([a-zA-Z0-9_-]+)/edit', function($id) {
     Auth::requireLogin();
+    Csrf::requireValidToken();
 
     // Resolve alias to real ID if needed
     $realId = Paste::getRealId($id);
@@ -441,6 +445,7 @@ $router->get('/notes/?', function() {
 // Delete paste
 $router->post('/notes/([a-zA-Z0-9_-]+)/delete', function($id) {
     Auth::requireLogin();
+    Csrf::requireValidToken();
 
     // Resolve alias to real ID if needed
     $realId = Paste::getRealId($id);
@@ -463,6 +468,7 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/delete', function($id) {
 // Rerender single paste
 $router->post('/notes/([a-zA-Z0-9_-]+)/rerender', function($id) {
     Auth::requireLogin();
+    Csrf::requireValidToken();
 
     if (!Paste::exists($id)) {
         Helpers::show404();
@@ -481,6 +487,7 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/rerender', function($id) {
 // Rerender all pastes
 $router->post('/notes/rerender-all', function() use ($twig) {
     Auth::requireLogin();
+    Csrf::requireValidToken();
 
     try {
         $pastes = Paste::listAll();
@@ -548,7 +555,10 @@ $router->get('/notes/([a-zA-Z0-9_-]+)/files/(.+)', function($id, $filename) {
     $isTextOrImage = str_starts_with($mimeType, 'text/') || str_starts_with($mimeType, 'image/');
 
     if (($fileMeta['render'] ?? '') === 'file' && !$isTextOrImage) {
-        header('Content-Disposition: attachment; filename="' . basename($filename) . '"');
+        // Sanitize filename for Content-Disposition header (RFC 6266)
+        $safeFilename = preg_replace('/[^\x20-\x7E]/', '_', basename($filename));
+        $safeFilename = str_replace(['"', '\\'], '_', $safeFilename);
+        header('Content-Disposition: attachment; filename="' . $safeFilename . '"');
     }
 
     readfile($filePath);

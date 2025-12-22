@@ -33,6 +33,7 @@ class Auth
             // Check if AUTH_PASSWORD_HASH is set (takes priority)
             if ($envPasswordHash) {
                 if (password_verify($password, $envPasswordHash)) {
+                    session_regenerate_id(true);
                     self::$currentUser = $username;
                     $_SESSION['username'] = $username;
                     return true;
@@ -41,6 +42,7 @@ class Auth
             // Otherwise check AUTH_PASSWORD (plain text)
             elseif ($envPassword) {
                 if ($password === $envPassword) {
+                    session_regenerate_id(true);
                     self::$currentUser = $username;
                     $_SESSION['username'] = $username;
                     return true;
@@ -71,6 +73,7 @@ class Auth
 
             if ($storedUser === $username) {
                 if (password_verify($password, $storedHash)) {
+                    session_regenerate_id(true);
                     self::$currentUser = $username;
                     $_SESSION['username'] = $username;
                     return true;

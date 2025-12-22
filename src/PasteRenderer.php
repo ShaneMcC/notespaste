@@ -15,11 +15,8 @@ class PasteRenderer
     public function __construct(Paste $paste)
     {
         $this->paste = $paste;
-
-        $loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
-        $this->twig = new \Twig\Environment($loader);
-
-        // Don't set basePath - let templates use relative paths via default filter
+        // Don't set basePath - rendered pastes use relative paths
+        $this->twig = TwigFactory::create();
     }
 
     public function render(): string

@@ -6,7 +6,8 @@ class Helpers
 {
     public static function getMimeType(string $filePath): string
     {
-        $mimeType = mime_content_type($filePath);
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mimeType = $finfo->file($filePath);
         return $mimeType !== false ? $mimeType : 'application/octet-stream';
     }
 
@@ -69,11 +70,8 @@ class Helpers
     public static function show404(): void
     {
         http_response_code(404);
-        $loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
-        $twig = new \Twig\Environment($loader);
-
         $basePath = defined('BASE_PATH') ? BASE_PATH : '';
-        $twig->addGlobal('basePath', $basePath);
+        $twig = TwigFactory::create($basePath);
 
         // Only show login link if on the root path
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
@@ -89,11 +87,8 @@ class Helpers
     public static function show500(): void
     {
         http_response_code(500);
-        $loader = new \Twig\Loader\FilesystemLoader(__DIR__ . '/../templates');
-        $twig = new \Twig\Environment($loader);
-
         $basePath = defined('BASE_PATH') ? BASE_PATH : '';
-        $twig->addGlobal('basePath', $basePath);
+        $twig = TwigFactory::create($basePath);
 
         echo $twig->render('500.html.twig');
         exit;

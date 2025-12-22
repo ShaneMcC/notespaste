@@ -160,9 +160,9 @@ class Paste
         if (isset($data['id']) && $data['id'] !== '') {
             $id = $data['id'];
 
-            // Validate custom ID
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $id)) {
-                throw new \RuntimeException("Paste ID must contain only alphanumeric characters, hyphens, and underscores");
+            // Validate custom ID (alphanumeric, hyphens, underscores, max 64 chars)
+            if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $id)) {
+                throw new \RuntimeException("Paste ID must contain only alphanumeric characters, hyphens, and underscores (max 64 characters)");
             }
 
             // Check if ID already exists
@@ -462,9 +462,9 @@ class Paste
         if ($aliasId === null) {
             $aliasId = self::generateId();
         } else {
-            // Validate user-provided alias
-            if (!preg_match('/^[a-zA-Z0-9_-]+$/', $aliasId)) {
-                throw new \RuntimeException("Alias ID must contain only alphanumeric characters, hyphens, and underscores");
+            // Validate user-provided alias (alphanumeric, hyphens, underscores, max 64 chars)
+            if (!preg_match('/^[a-zA-Z0-9_-]{1,64}$/', $aliasId)) {
+                throw new \RuntimeException("Alias ID must contain only alphanumeric characters, hyphens, and underscores (max 64 characters)");
             }
 
             // Check if alias already exists

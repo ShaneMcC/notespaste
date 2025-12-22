@@ -1,0 +1,769 @@
+/**
+ * Paste Editor JavaScript
+ * Handles file management, drag-and-drop, ID generation, and alias management
+ */
+
+// Configuration - set by the page
+let editConfig = {
+    basePath: '',
+    csrfToken: '',
+    pasteId: '',
+    pasteTitle: '',
+    fileIndex: 0
+};
+
+function initEditConfig(config) {
+    editConfig = { ...editConfig, ...config };
+}
+
+// File Management
+function addFile() {
+    const container = document.getElementById('files-container');
+    const fileEditor = document.createElement('div');
+    fileEditor.className = 'file-editor';
+    fileEditor.setAttribute('data-file-index', editConfig.fileIndex);
+    fileEditor.setAttribute('draggable', 'true');
+    fileEditor.setAttribute('ondragstart', 'handleDragStart(event)');
+    fileEditor.setAttribute('ondragover', 'handleDragOver(event)');
+    fileEditor.setAttribute('ondrop', 'handleDrop(event)');
+    fileEditor.setAttribute('ondragend', 'handleDragEnd(event)');
+
+    fileEditor.innerHTML = `
+        <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
+            <div class="file-editor-header-left">
+                <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
+                <span class="collapse-icon">▼</span>
+                <h3>File #${editConfig.fileIndex + 1}</h3>
+                <span class="file-editor-names"></span>
+            </div>
+            <button type="button" class="secondary" onclick="event.stopPropagation(); removeFile(this)">Remove</button>
+        </div>
+
+        <div class="file-editor-body">
+        <div class="inline-fields">
+            <div class="form-group">
+                <label>Filename</label>
+                <input type="text" name="files[${editConfig.fileIndex}][filename]" required oninput="updateDisplayFileDropdown()">
+            </div>
+
+            <div class="form-group">
+                <label>Render Mode</label>
+                <select name="files[${editConfig.fileIndex}][render]" class="render-select" onchange="updateFileFields(this)">
+                    <option value="plain">Plain</option>
+                    <option value="highlighted" selected>Highlighted</option>
+                    <option value="rendered">Rendered Markdown</option>
+                    <option value="image">Image</option>
+                    <option value="file">File Download</option>
+                    <option value="file-link">File Link</option>
+                    <option value="link">List of Links</option>
+                </select>
+            </div>
+
+            <div class="form-group file-type-field">
+                <label>Type</label>
+                <select name="files[${editConfig.fileIndex}][type]" class="type-select">
+                    <option value="">Auto-detect</option>
+                    <option value="bash">Bash</option>
+                    <option value="c">C</option>
+                    <option value="cpp">C++</option>
+                    <option value="csharp">C#</option>
+                    <option value="css">CSS</option>
+                    <option value="diff">Diff</option>
+                    <option value="go">Go</option>
+                    <option value="html">HTML</option>
+                    <option value="java">Java</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="json">JSON</option>
+                    <option value="kotlin">Kotlin</option>
+                    <option value="markdown">Markdown</option>
+                    <option value="php">PHP</option>
+                    <option value="python">Python</option>
+                    <option value="ruby">Ruby</option>
+                    <option value="rust">Rust</option>
+                    <option value="sql">SQL</option>
+                    <option value="swift">Swift</option>
+                    <option value="typescript">TypeScript</option>
+                    <option value="xml">XML</option>
+                    <option value="yaml">YAML</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="files[${editConfig.fileIndex}][displayName]">Display Name (optional)</label>
+            <input type="text" id="files[${editConfig.fileIndex}][displayName]" name="files[${editConfig.fileIndex}][displayName]" placeholder="Leave empty to use filename" oninput="updateDisplayFileDropdown()">
+        </div>
+
+        <div class="form-group">
+            <label>Description</label>
+            <input type="text" name="files[${editConfig.fileIndex}][description]">
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${editConfig.fileIndex}][hidden]" name="files[${editConfig.fileIndex}][hidden]" value="1">
+                <label for="files[${editConfig.fileIndex}][hidden]">Hidden (don't show in multi-file mode)</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${editConfig.fileIndex}][unwrapped]" name="files[${editConfig.fileIndex}][unwrapped]" value="1">
+                <label for="files[${editConfig.fileIndex}][unwrapped]">Unwrapped (render without file header/wrapper)</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${editConfig.fileIndex}][collapsed]" name="files[${editConfig.fileIndex}][collapsed]" value="1">
+                <label for="files[${editConfig.fileIndex}][collapsed]">Start collapsed (multi-file mode)</label>
+            </div>
+        </div>
+
+        <div class="form-group file-line-numbers-field">
+            <div class="line-numbers-row">
+                <div class="checkbox-field">
+                    <input type="checkbox" id="files[${editConfig.fileIndex}][lineNumbers]" name="files[${editConfig.fileIndex}][lineNumbers]" value="1" onchange="toggleLineNumberStart(this)">
+                    <label for="files[${editConfig.fileIndex}][lineNumbers]">Show line numbers</label>
+                </div>
+                <div class="line-number-start hidden">
+                    <label for="files[${editConfig.fileIndex}][lineNumberStart]">Start from:</label>
+                    <input type="number" id="files[${editConfig.fileIndex}][lineNumberStart]" name="files[${editConfig.fileIndex}][lineNumberStart]" value="1" min="1">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="files[${editConfig.fileIndex}][collapsedDescription]">Collapsed Description (optional)</label>
+            <input type="text" id="files[${editConfig.fileIndex}][collapsedDescription]" name="files[${editConfig.fileIndex}][collapsedDescription]" placeholder="Brief description shown when collapsed">
+        </div>
+
+        <div class="form-group file-content-field">
+            <label>Content (or upload file below)</label>
+            <textarea name="files[${editConfig.fileIndex}][content]" rows="10"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Or Upload File</label>
+            <input type="file" name="file_uploads[${editConfig.fileIndex}]">
+        </div>
+        </div>
+    `;
+
+    container.appendChild(fileEditor);
+
+    // Initialize field visibility for new file
+    const renderSelect = fileEditor.querySelector('.render-select');
+    updateFileFields(renderSelect);
+
+    // Setup drag and drop for new file editor
+    setupDragAndDrop(fileEditor);
+
+    // Update display file dropdown to include new file
+    updateDisplayFileDropdown();
+
+    editConfig.fileIndex++;
+}
+
+function removeFile(button) {
+    button.closest('.file-editor').remove();
+
+    // Update display file dropdown to remove deleted file
+    updateDisplayFileDropdown();
+}
+
+function updateFileFields(renderSelect) {
+    const fileEditor = renderSelect.closest('.file-editor');
+    const renderMode = renderSelect.value;
+    const typeField = fileEditor.querySelector('.file-type-field');
+    const contentField = fileEditor.querySelector('.file-content-field');
+    const fileExistsIndicator = fileEditor.querySelector('.file-exists-indicator');
+    const typeSelect = fileEditor.querySelector('.type-select');
+    const lineNumbersField = fileEditor.querySelector('.file-line-numbers-field');
+
+    // Hide type for image/file/file-link/link/rendered modes
+    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link' || renderMode === 'rendered') {
+        typeField.classList.add('hidden');
+        // Set type to match render mode
+        if (renderMode === 'rendered') {
+            typeSelect.value = 'markdown';
+        } else {
+            typeSelect.value = renderMode;
+        }
+    } else {
+        typeField.classList.remove('hidden');
+        // If current type value is not valid for this dropdown, reset to auto-detect
+        const currentValue = typeSelect.value;
+
+        // Check if the current value is one of the special render types that shouldn't be in the type dropdown
+        // Also check for '' which happens when an invalid value was set (browser returns '' for invalid values)
+        if (['', 'image', 'file', 'file-link', 'link', 'markdown', 'rendered'].includes(currentValue)) {
+            typeSelect.value = ''; // Reset to Auto-detect
+        }
+    }
+
+    // Hide content for image/file/file-link modes (but not link - that needs content)
+    // However, always show content field if there's no existing file (new file being created)
+    if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link') {
+        const textarea = contentField.querySelector('textarea');
+        const hasContent = textarea && textarea.value.trim().length > 0;
+        const hasExistingFile = fileExistsIndicator && !fileExistsIndicator.classList.contains('hidden');
+
+        // Show content field if: it has text content OR there's no existing file (new file)
+        if (hasContent || !hasExistingFile) {
+            // Show content field
+            contentField.classList.remove('hidden');
+            if (fileExistsIndicator) {
+                fileExistsIndicator.classList.add('hidden');
+            }
+        } else {
+            // Binary file exists - hide content, show indicator
+            contentField.classList.add('hidden');
+            if (fileExistsIndicator) {
+                fileExistsIndicator.classList.remove('hidden');
+            }
+        }
+    } else {
+        contentField.classList.remove('hidden');
+        // Hide file exists indicator
+        if (fileExistsIndicator) {
+            fileExistsIndicator.classList.add('hidden');
+        }
+    }
+
+    // Show line numbers option only for highlighted mode
+    if (lineNumbersField) {
+        if (renderMode === 'highlighted') {
+            lineNumbersField.classList.remove('hidden');
+        } else {
+            lineNumbersField.classList.add('hidden');
+        }
+    }
+}
+
+function toggleLineNumberStart(checkbox) {
+    const startField = checkbox.closest('.line-numbers-row').querySelector('.line-number-start');
+    if (checkbox.checked) {
+        startField.classList.remove('hidden');
+    } else {
+        startField.classList.add('hidden');
+    }
+}
+
+function updateDisplayModeFields() {
+    const displayMode = document.getElementById('displayMode').value;
+    const selectedFileGroup = document.getElementById('selectedFileGroup');
+
+    // Show file selector only for single-file modes
+    if (displayMode === 'single-normal' || displayMode === 'single-wide') {
+        selectedFileGroup.classList.remove('hidden');
+    } else {
+        selectedFileGroup.classList.add('hidden');
+    }
+}
+
+function toggleFileEditor(event, header) {
+    const fileEditor = header.closest('.file-editor');
+    const icon = header.querySelector('.collapse-icon');
+    const namesSpan = header.querySelector('.file-editor-names');
+
+    if (fileEditor.classList.contains('collapsed')) {
+        // Expand
+        fileEditor.classList.remove('collapsed');
+        icon.textContent = '▼';
+        namesSpan.textContent = '';
+    } else {
+        // Collapse - show filename and display name
+        const filenameInput = fileEditor.querySelector('input[name*="[filename]"]');
+        const displayNameInput = fileEditor.querySelector('input[name*="[displayName]"]');
+        const hiddenCheckbox = fileEditor.querySelector('input[name*="[hidden]"]');
+
+        let names = '';
+        if (filenameInput && filenameInput.value) {
+            names = filenameInput.value;
+            if (displayNameInput && displayNameInput.value) {
+                names += ' (' + displayNameInput.value + ')';
+            }
+        }
+
+        // Add hidden indicator if checkbox is checked
+        let hiddenIndicator = '';
+        if (hiddenCheckbox && hiddenCheckbox.checked) {
+            hiddenIndicator = ' <span class="file-hidden-indicator">[Hidden]</span>';
+        }
+
+        fileEditor.classList.add('collapsed');
+        icon.textContent = '►︎';
+        namesSpan.innerHTML = names ? ' - ' + names + hiddenIndicator : '';
+    }
+}
+
+// Drag and drop functionality
+let draggedElement = null;
+
+function handleDragStart(event) {
+    draggedElement = event.target.closest('.file-editor');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/html', draggedElement.innerHTML);
+    draggedElement.classList.add('dragging');
+}
+
+function handleDragOver(event) {
+    if (event.preventDefault) {
+        event.preventDefault();
+    }
+    event.dataTransfer.dropEffect = 'move';
+
+    const targetElement = event.target.closest('.file-editor');
+    if (targetElement && targetElement !== draggedElement) {
+        const container = document.getElementById('files-container');
+        const allEditors = Array.from(container.querySelectorAll('.file-editor'));
+        const draggedIndex = allEditors.indexOf(draggedElement);
+        const targetIndex = allEditors.indexOf(targetElement);
+
+        if (draggedIndex < targetIndex) {
+            targetElement.parentNode.insertBefore(draggedElement, targetElement.nextSibling);
+        } else {
+            targetElement.parentNode.insertBefore(draggedElement, targetElement);
+        }
+    }
+
+    return false;
+}
+
+function handleDrop(event) {
+    if (event.stopPropagation) {
+        event.stopPropagation();
+    }
+    return false;
+}
+
+function handleDragEnd(event) {
+    draggedElement.classList.remove('dragging');
+    draggedElement = null;
+
+    // Renumber all files and update form field indices
+    const container = document.getElementById('files-container');
+    const allEditors = container.querySelectorAll('.file-editor');
+    allEditors.forEach((editor, index) => {
+        // Update visual file number
+        const h3 = editor.querySelector('h3');
+        if (h3) {
+            h3.textContent = 'File #' + (index + 1);
+        }
+
+        // Update data attribute
+        editor.setAttribute('data-file-index', index);
+
+        // Update all form field names to use new index
+        editor.querySelectorAll('input, textarea, select').forEach(field => {
+            if (field.name && field.name.startsWith('files[')) {
+                // Replace files[oldIndex] with files[newIndex]
+                field.name = field.name.replace(/^files\[\d+\]/, `files[${index}]`);
+
+                // Update id if it exists and follows the same pattern
+                if (field.id && field.id.startsWith('files[')) {
+                    field.id = field.id.replace(/^files\[\d+\]/, `files[${index}]`);
+                }
+            } else if (field.name && field.name.startsWith('file_uploads[')) {
+                // Update file upload field names too
+                field.name = field.name.replace(/^file_uploads\[\d+\]/, `file_uploads[${index}]`);
+            }
+        });
+
+        // Update labels that reference file fields
+        editor.querySelectorAll('label').forEach(label => {
+            if (label.htmlFor && label.htmlFor.startsWith('files[')) {
+                label.htmlFor = label.htmlFor.replace(/^files\[\d+\]/, `files[${index}]`);
+            }
+        });
+    });
+
+    // Update the display file dropdown to reflect new order
+    updateDisplayFileDropdown();
+}
+
+function updateDisplayFileDropdown() {
+    const selectedFileSelect = document.getElementById('selectedFile');
+    if (!selectedFileSelect) return;
+
+    const currentValue = selectedFileSelect.value;
+    const currentSelectedIndex = selectedFileSelect.selectedIndex;
+    const container = document.getElementById('files-container');
+    const allEditors = container.querySelectorAll('.file-editor');
+
+    // Clear existing options
+    selectedFileSelect.innerHTML = '';
+
+    // Rebuild options in new order
+    let matchFound = false;
+    allEditors.forEach((editor, index) => {
+        const filenameInput = editor.querySelector('input[name*="[filename]"]');
+        const displayNameInput = editor.querySelector('input[name*="[displayName]"]');
+
+        if (filenameInput) {
+            const option = document.createElement('option');
+            option.value = filenameInput.value || '';
+            option.textContent = `${index + 1}. ${filenameInput.value || 'unnamed'}`;
+
+            if (displayNameInput && displayNameInput.value) {
+                option.textContent += ` (${displayNameInput.value})`;
+            }
+
+            // Try to restore selection by matching filename first
+            if (filenameInput.value && filenameInput.value === currentValue) {
+                option.selected = true;
+                matchFound = true;
+            }
+
+            selectedFileSelect.appendChild(option);
+        }
+    });
+
+    // If no match was found by filename, restore by index position
+    if (!matchFound && currentSelectedIndex >= 0 && currentSelectedIndex < selectedFileSelect.options.length) {
+        selectedFileSelect.selectedIndex = currentSelectedIndex;
+    }
+}
+
+// Drag and drop file upload support
+function setupDragAndDrop(fileEditor) {
+    const dropZone = fileEditor.querySelector('.file-editor-body');
+    const fileInput = fileEditor.querySelector('input[type="file"]');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+    });
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, highlight, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, unhighlight, false);
+    });
+
+    function highlight(e) {
+        dropZone.classList.add('drag-over');
+    }
+
+    function unhighlight(e) {
+        dropZone.classList.remove('drag-over');
+    }
+
+    dropZone.addEventListener('drop', handleFileDrop, false);
+
+    function handleFileDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        if (files.length > 0) {
+            // Set the file input to the dropped file
+            fileInput.files = files;
+
+            // Trigger change event to show file name
+            const event = new Event('change', { bubbles: true });
+            fileInput.dispatchEvent(event);
+        }
+    }
+}
+
+// ID generation utilities
+function generateRandomId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const length = 20 + Math.floor(Math.random() * 11); // 20-30 characters
+    let id = '';
+    for (let i = 0; i < length; i++) {
+        id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return id;
+}
+
+function generateReadableId() {
+    const { uniqueNamesGenerator: generate, adjectives, colors, animals } = uniqueNamesGenerator;
+    return generate({
+        dictionaries: [adjectives, colors, animals],
+        separator: '-',
+        style: 'lowerCase'
+    });
+}
+
+// Generate and validate a unique ID
+// type: 'random' or 'readable'
+// existsLocally: optional function to check if ID exists in local list (for aliases)
+// maxAttempts: number of retries before failing (default 10)
+// Returns: { success: true, id: string } or { success: false, error: string }
+async function generateValidId(type, existsLocally = null, maxAttempts = 10) {
+    const generator = type === 'readable' ? generateReadableId : generateRandomId;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const candidateId = generator();
+
+        // Check local list first if provided
+        if (existsLocally && existsLocally(candidateId)) {
+            continue;
+        }
+
+        try {
+            const response = await fetch(editConfig.basePath + '/notes/new/id/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ pasteId: candidateId })
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                return { success: true, id: candidateId };
+            }
+            // ID exists on server, try again
+        } catch (error) {
+            // Network error - return the ID anyway, server will validate on submit
+            return { success: true, id: candidateId };
+        }
+    }
+
+    return { success: false, error: `Failed to generate unique ${type} ID after ${maxAttempts} attempts` };
+}
+
+// Paste ID field helpers
+async function generatePasteId() {
+    const result = await generateValidId('random');
+    const input = document.getElementById('paste-id');
+    const errorDiv = document.getElementById('paste-id-error');
+
+    if (result.success) {
+        input.value = result.id;
+        if (errorDiv) errorDiv.style.display = 'none';
+    } else {
+        if (errorDiv) {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+async function generateReadablePasteId() {
+    const result = await generateValidId('readable');
+    const input = document.getElementById('paste-id');
+    const errorDiv = document.getElementById('paste-id-error');
+
+    if (result.success) {
+        input.value = result.id;
+        if (errorDiv) errorDiv.style.display = 'none';
+    } else {
+        if (errorDiv) {
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+        }
+    }
+}
+
+// Delete paste with confirmation
+function deletePaste() {
+    if (!confirm('Are you sure you want to delete "' + editConfig.pasteTitle + '"?\n\nThis will permanently delete the paste and all its aliases. This action cannot be undone.')) {
+        return;
+    }
+
+    // Create a form and submit it
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = editConfig.basePath + '/notes/' + editConfig.pasteId + '/delete';
+
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrf_token';
+    csrfInput.value = editConfig.csrfToken;
+    form.appendChild(csrfInput);
+
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Alias management functions
+async function addRandomAlias() {
+    const result = await generateValidId('random', aliasExistsInList);
+    if (result.success) {
+        addAliasToList(result.id);
+    } else {
+        showAliasError(result.error);
+    }
+}
+
+async function addReadableAlias() {
+    const result = await generateValidId('readable', aliasExistsInList);
+    if (result.success) {
+        addAliasToList(result.id);
+    } else {
+        showAliasError(result.error);
+    }
+}
+
+function addCustomAlias() {
+    const aliasId = prompt('Enter custom alias ID (alphanumeric, hyphens, and underscores):');
+
+    if (!aliasId) {
+        return; // User cancelled
+    }
+
+    // Validate with server
+    fetch(editConfig.basePath + '/notes/new/id/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pasteId: aliasId })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Check if alias already exists in the list
+            if (aliasExistsInList(aliasId)) {
+                showAliasError('Alias ID already exists in the list');
+                return;
+            }
+
+            // Add to the list (will be saved on form submit)
+            addAliasToList(aliasId);
+        } else {
+            showAliasError(data.error || 'Invalid alias ID');
+        }
+    })
+    .catch(error => {
+        showAliasError('Network error: ' + error.message);
+    });
+}
+
+function removeAlias(aliasId) {
+    const container = document.getElementById('aliases-container');
+    const aliasItem = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    // Check if trying to remove the primary (should have buttons hidden, but just in case)
+    if (aliasItem && aliasItem.getAttribute('data-is-primary') === 'true') {
+        showAliasError('Cannot remove the primary ID. Make another ID primary first.');
+        return;
+    }
+
+    // Remove from the DOM (will be saved on form submit)
+    removeAliasFromList(aliasId);
+}
+
+function makePrimaryAlias(aliasId) {
+    const container = document.getElementById('aliases-container');
+
+    // Find the currently marked primary item
+    const currentPrimary = container.querySelector('[data-is-primary="true"]');
+
+    // Find the item to make primary
+    const newPrimary = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    if (!currentPrimary || !newPrimary) {
+        return;
+    }
+
+    // Set the hidden field to indicate which alias should become primary on save
+    document.getElementById('make-primary-id').value = aliasId;
+
+    // Update the current primary item
+    currentPrimary.setAttribute('data-is-primary', 'false');
+    currentPrimary.classList.remove('primary-id');
+    const currentPrimaryLabel = currentPrimary.querySelector('.primary-label');
+    if (currentPrimaryLabel) {
+        currentPrimaryLabel.remove();
+    }
+    // Show buttons on old primary
+    const currentButtons = currentPrimary.querySelector('.alias-actions-buttons');
+    if (currentButtons) {
+        currentButtons.style.display = 'flex';
+    }
+
+    // Update the new primary item
+    newPrimary.setAttribute('data-is-primary', 'true');
+    newPrimary.classList.add('primary-id');
+
+    // Add "Primary:" label if not exists
+    if (!newPrimary.querySelector('.primary-label')) {
+        const label = document.createElement('span');
+        label.className = 'primary-label';
+        label.textContent = 'Primary:';
+        newPrimary.insertBefore(label, newPrimary.firstChild);
+    }
+
+    // Hide buttons on new primary
+    const newButtons = newPrimary.querySelector('.alias-actions-buttons');
+    if (newButtons) {
+        newButtons.style.display = 'none';
+    }
+}
+
+function addAliasToList(aliasId) {
+    const container = document.getElementById('aliases-container');
+
+    // Create new alias item (always as non-primary)
+    const aliasItem = document.createElement('div');
+    aliasItem.className = 'alias-item';
+    aliasItem.setAttribute('data-alias-id', aliasId);
+    aliasItem.setAttribute('data-is-primary', 'false');
+    aliasItem.innerHTML = `
+        <code>${escapeHtml(aliasId)}</code>
+        <input type="hidden" name="aliases[]" value="${escapeHtml(aliasId)}">
+        <div class="alias-actions-buttons">
+            <button type="button" class="secondary small" onclick="makePrimaryAlias('${escapeHtml(aliasId)}')">Make Primary</button>
+            <button type="button" class="secondary small" onclick="removeAlias('${escapeHtml(aliasId)}')">Remove</button>
+        </div>
+    `;
+
+    container.appendChild(aliasItem);
+}
+
+function removeAliasFromList(aliasId) {
+    const container = document.getElementById('aliases-container');
+    const aliasItem = container.querySelector(`[data-alias-id="${aliasId}"]`);
+
+    if (aliasItem) {
+        aliasItem.remove();
+    }
+
+    // If no more aliases, show "no aliases" message
+    if (container.children.length === 0) {
+        const noAliases = document.createElement('p');
+        noAliases.className = 'no-aliases';
+        noAliases.textContent = 'No aliases yet';
+        container.appendChild(noAliases);
+    }
+}
+
+function aliasExistsInList(aliasId) {
+    const container = document.getElementById('aliases-container');
+    return container.querySelector(`[data-alias-id="${aliasId}"]`) !== null;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function showAliasError(message) {
+    const errorDiv = document.getElementById('alias-error');
+    errorDiv.textContent = message;
+    errorDiv.style.display = 'block';
+    setTimeout(() => {
+        errorDiv.style.display = 'none';
+    }, 5000);
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.render-select').forEach(function(select) {
+        updateFileFields(select);
+    });
+    updateDisplayModeFields();
+
+    // Setup drag and drop for all file editors
+    document.querySelectorAll('.file-editor').forEach(function(fileEditor) {
+        setupDragAndDrop(fileEditor);
+    });
+});
