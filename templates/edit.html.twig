@@ -10,7 +10,10 @@
         {% if not isNew %}
             <a href="{{ paste.getHtmlUrl() }}" class="button secondary">View</a>
         {% endif %}
-        <a href="{{ basePath }}/logout" class="button secondary">Logout</a>
+        <form method="post" action="{{ basePath }}/logout" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
+            <button type="submit" class="button secondary">Logout</button>
+        </form>
     </div>
 </header>
 
@@ -160,30 +163,9 @@
 
                     <div class="form-group file-type-field">
                         <label>Type</label>
-                        <select name="files[{{ loop.index0 }}][type]" class="type-select">
-                            <option value="">Auto-detect</option>
-                            <option value="bash" {% if fileMeta.type == 'bash' %}selected{% endif %}>Bash</option>
-                            <option value="c" {% if fileMeta.type == 'c' %}selected{% endif %}>C</option>
-                            <option value="cpp" {% if fileMeta.type == 'cpp' %}selected{% endif %}>C++</option>
-                            <option value="csharp" {% if fileMeta.type == 'csharp' %}selected{% endif %}>C#</option>
-                            <option value="css" {% if fileMeta.type == 'css' %}selected{% endif %}>CSS</option>
-                            <option value="diff" {% if fileMeta.type == 'diff' %}selected{% endif %}>Diff</option>
-                            <option value="go" {% if fileMeta.type == 'go' %}selected{% endif %}>Go</option>
-                            <option value="html" {% if fileMeta.type == 'html' %}selected{% endif %}>HTML</option>
-                            <option value="java" {% if fileMeta.type == 'java' %}selected{% endif %}>Java</option>
-                            <option value="javascript" {% if fileMeta.type == 'javascript' %}selected{% endif %}>JavaScript</option>
-                            <option value="json" {% if fileMeta.type == 'json' %}selected{% endif %}>JSON</option>
-                            <option value="kotlin" {% if fileMeta.type == 'kotlin' %}selected{% endif %}>Kotlin</option>
-                            <option value="markdown" {% if fileMeta.type == 'markdown' %}selected{% endif %}>Markdown</option>
-                            <option value="php" {% if fileMeta.type == 'php' %}selected{% endif %}>PHP</option>
-                            <option value="python" {% if fileMeta.type == 'python' %}selected{% endif %}>Python</option>
-                            <option value="ruby" {% if fileMeta.type == 'ruby' %}selected{% endif %}>Ruby</option>
-                            <option value="rust" {% if fileMeta.type == 'rust' %}selected{% endif %}>Rust</option>
-                            <option value="sql" {% if fileMeta.type == 'sql' %}selected{% endif %}>SQL</option>
-                            <option value="swift" {% if fileMeta.type == 'swift' %}selected{% endif %}>Swift</option>
-                            <option value="typescript" {% if fileMeta.type == 'typescript' %}selected{% endif %}>TypeScript</option>
-                            <option value="xml" {% if fileMeta.type == 'xml' %}selected{% endif %}>XML</option>
-                            <option value="yaml" {% if fileMeta.type == 'yaml' %}selected{% endif %}>YAML</option>
+                        <select name="files[{{ loop.index0 }}][type]" class="type-select" data-initial-value="{{ fileMeta.type }}">
+                            {# Options populated dynamically by JavaScript from highlight.js #}
+                            <option value="">Loading languages...</option>
                         </select>
                     </div>
                 </div>
@@ -276,6 +258,7 @@
     </div>
 </form>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@joaomoreno/unique-names-generator@5.2.0/dist/index.umd.js" integrity="sha384-aGx4wBvQT6SiLIGqTLqNARarTjnk0ALUqo+mc9EGfqCS0zJ2QY/o8awSjcc/1d1/" crossorigin="anonymous"></script>
 <script src="{{ basePath }}/static/edit.js"></script>
 <script>

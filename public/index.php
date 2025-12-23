@@ -10,6 +10,7 @@ use App\Paste;
 use App\Helpers;
 use App\Csrf;
 use App\TwigFactory;
+use App\RenderMode;
 
 // Initialize authentication
 Auth::init($config['htpasswd_path']);
@@ -37,7 +38,8 @@ $twig->addGlobal('csrfToken', Csrf::getToken());
 // Helper function to process file data from form submission
 function processFileData(int $index, array $fileData): array {
     $filename = Helpers::sanitizeFilename($fileData['filename'] ?? 'untitled.txt');
-    $render = $fileData['render'] ?? 'plain';
+    $renderValue = $fileData['render'] ?? RenderMode::PLAIN->value;
+    $renderMode = RenderMode::tryFrom($renderValue) ?? RenderMode::PLAIN;
     $type = $fileData['type'] ?? 'text';
 
     // Check if file was uploaded
@@ -47,19 +49,20 @@ function processFileData(int $index, array $fileData): array {
         $content = file_get_contents($_FILES['file_uploads']['tmp_name'][$index]);
 
         // Auto-detect render mode for uploaded files if not already set to file/image modes
-        if (!in_array($render, ['image', 'file', 'file-link'])) {
+        $binaryModes = [RenderMode::IMAGE, RenderMode::FILE, RenderMode::FILE_LINK];
+        if (!in_array($renderMode, $binaryModes)) {
             $finfo = new \finfo(FILEINFO_MIME_TYPE);
             $mimeType = $finfo->file($_FILES['file_uploads']['tmp_name'][$index]);
 
             // Check if it's an image
             if (strpos($mimeType, 'image/') === 0) {
-                $render = 'image';
+                $renderMode = RenderMode::IMAGE;
                 $type = 'image';
             }
             // Check if it's binary (not text)
             elseif (strpos($mimeType, 'text/') !== 0 &&
                     !in_array($mimeType, ['application/json', 'application/xml', 'application/javascript'])) {
-                $render = 'file';
+                $renderMode = RenderMode::FILE;
                 $type = 'file';
             }
         }
@@ -67,18 +70,17 @@ function processFileData(int $index, array $fileData): array {
         $content = $fileData['content'];
     }
 
-    // Override type for image/file/file-link/link/rendered render modes
-    if (in_array($render, ['image', 'file', 'file-link', 'link'])) {
-        $type = $render;
-    } elseif ($render === 'rendered') {
-        $type = 'markdown';
+    // Override type for modes that have auto-type
+    $autoType = $renderMode->autoType();
+    if ($autoType !== null) {
+        $type = $autoType;
     }
 
     $fileMeta = [
         'displayName' => $fileData['displayName'] ?? '',
         'description' => $fileData['description'] ?? '',
         'type' => $type,
-        'render' => $render,
+        'render' => $renderMode->value,
         'hidden' => isset($fileData['hidden']) && $fileData['hidden'] === '1',
         'unwrapped' => isset($fileData['unwrapped']) && $fileData['unwrapped'] === '1',
         'collapsed' => isset($fileData['collapsed']) && $fileData['collapsed'] === '1',
@@ -137,7 +139,8 @@ $router->post('/login', function() {
 });
 
 // Logout
-$router->get('/logout', function() {
+$router->post('/logout', function() {
+    Csrf::requireValidToken();
     Auth::logout();
     Helpers::redirect(BASE_PATH . '/');
 });
@@ -296,93 +299,29 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/edit', function($id) {
 
         $paste->update($data);
 
-        // Track existing files to determine what to remove
-        $existingFiles = array_keys($paste->getFiles());
-        $filesToRemove = [];
-        $filesToRename = []; // [originalFilename => newFilename]
-        $filesToUpdate = []; // [filename => [content, fileMeta]]
-        $filesToAdd = []; // [filename => [content, fileMeta]]
-        $newFilesOrder = [];
-
-        // First pass: collect all operations
+        // Process and sync files
+        $submittedFiles = [];
         if (isset($_POST['files'])) {
             $usedFilenames = [];
-
             foreach ($_POST['files'] as $index => $fileData) {
                 $processed = processFileData($index, $fileData);
-                $originalFilename = $processed['originalFilename'];
-                $newFilename = $processed['filename'];
+                $filename = $processed['filename'];
 
-                // Check for duplicate filenames and add prefix if needed
-                if (in_array($newFilename, $usedFilenames)) {
-                    $newFilename = "file{$index}_{$newFilename}";
+                // Handle duplicate filenames
+                if (in_array($filename, $usedFilenames)) {
+                    $filename = "file{$index}_{$filename}";
                 }
-                $usedFilenames[] = $newFilename;
+                $usedFilenames[] = $filename;
 
-                // Determine operation type
-                if ($originalFilename && in_array($originalFilename, $existingFiles)) {
-                    // Existing file
-                    if ($originalFilename !== $newFilename) {
-                        // Rename operation
-                        $filesToRename[$originalFilename] = $newFilename;
-                    }
-                    // Update/add to update list
-                    $filesToUpdate[$newFilename] = ['content' => $processed['content'], 'fileMeta' => $processed['fileMeta'], 'originalFilename' => $originalFilename];
-                } else {
-                    // New file
-                    $filesToAdd[$newFilename] = ['content' => $processed['content'] ?? '', 'fileMeta' => $processed['fileMeta']];
-                }
-
-                $newFilesOrder[] = $newFilename;
+                $submittedFiles[] = [
+                    'filename' => $filename,
+                    'originalFilename' => $processed['originalFilename'],
+                    'content' => $processed['content'],
+                    'fileMeta' => $processed['fileMeta'],
+                ];
             }
         }
-
-        // Determine files to remove (existed before but not in form submission)
-        foreach ($existingFiles as $existingFile) {
-            $stillExists = false;
-            if (isset($_POST['files'])) {
-                foreach ($_POST['files'] as $fileData) {
-                    if (($fileData['originalFilename'] ?? null) === $existingFile) {
-                        $stillExists = true;
-                        break;
-                    }
-                }
-            }
-            if (!$stillExists) {
-                $filesToRemove[] = $existingFile;
-            }
-        }
-
-        // Stage 1: Rename files to temporary names to avoid conflicts
-        $tempRenames = [];
-        foreach ($filesToRename as $oldName => $newName) {
-            $tempName = '__temp_' . uniqid() . '_' . $oldName;
-            $paste->renameFile($oldName, $tempName);
-            $tempRenames[$tempName] = $newName;
-        }
-
-        // Stage 2: Rename from temp names to final names
-        foreach ($tempRenames as $tempName => $finalName) {
-            $paste->renameFile($tempName, $finalName);
-        }
-
-        // Update file metadata and content
-        foreach ($filesToUpdate as $filename => $data) {
-            $paste->updateFile($filename, $data['content'], $data['fileMeta']);
-        }
-
-        // Add new files
-        foreach ($filesToAdd as $filename => $data) {
-            $paste->addFile($filename, $data['content'], $data['fileMeta']);
-        }
-
-        // Remove deleted files
-        foreach ($filesToRemove as $filename) {
-            $paste->removeFile($filename);
-        }
-
-        // Reorder files in metadata to match form submission order
-        $paste->reorderFiles($newFilesOrder);
+        $paste->syncFiles($submittedFiles);
 
         // Handle alias changes - order matters to avoid deleting IDs we need
         $submittedAliases = isset($_POST['aliases']) ? array_filter($_POST['aliases']) : [];
@@ -554,7 +493,7 @@ $router->get('/notes/([a-zA-Z0-9_-]+)/files/(.+)', function($id, $filename) {
 
     $isTextOrImage = str_starts_with($mimeType, 'text/') || str_starts_with($mimeType, 'image/');
 
-    if (($fileMeta['render'] ?? '') === 'file' && !$isTextOrImage) {
+    if (($fileMeta['render'] ?? '') === RenderMode::FILE->value && !$isTextOrImage) {
         // Sanitize filename for Content-Disposition header (RFC 6266)
         $safeFilename = preg_replace('/[^\x20-\x7E]/', '_', basename($filename));
         $safeFilename = str_replace(['"', '\\'], '_', $safeFilename);

@@ -2,7 +2,6 @@
 
 namespace App;
 
-use League\CommonMark\CommonMarkConverter;
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
 use League\CommonMark\MarkdownConverter;
@@ -74,63 +73,61 @@ class PasteRenderer
 
     private function renderFileContent(string $filename, ?string $content, array $fileMeta): string
     {
-        $renderMode = $fileMeta['render'] ?? 'plain';
+        $renderModeValue = $fileMeta['render'] ?? RenderMode::PLAIN->value;
+        $renderMode = RenderMode::tryFrom($renderModeValue) ?? RenderMode::PLAIN;
 
         if ($content === null) {
             return '<p class="error">File not found</p>';
         }
 
-        switch ($renderMode) {
-            case 'plain':
-                return '<pre>' . htmlspecialchars($content) . '</pre>';
+        return match ($renderMode) {
+            RenderMode::PLAIN => '<pre>' . htmlspecialchars($content) . '</pre>',
 
-            case 'highlighted':
-                $type = $fileMeta['type'] ?? 'text';
-                $lineNumbersClass = !empty($fileMeta['lineNumbers']) ? ' line-numbers' : '';
-                $lineNumberStart = (int)($fileMeta['lineNumberStart'] ?? 1) ?: 1;
-                $dataAttr = $lineNumberStart !== 1 ? ' data-ln-start-from="' . $lineNumberStart . '"' : '';
-                return '<pre class="hljs-pre' . $lineNumbersClass . '"' . $dataAttr . '><code class="language-' . htmlspecialchars($type) . '">' .
-                    htmlspecialchars($content) . '</code></pre>';
+            RenderMode::HIGHLIGHTED => $this->renderHighlighted($content, $fileMeta),
 
-            case 'image':
-                $url = './files/' . urlencode($filename);
-                return '<img src="' . htmlspecialchars($url) . '" alt="' . htmlspecialchars($filename) . '" />';
+            RenderMode::IMAGE => '<img src="' . htmlspecialchars('./files/' . urlencode($filename)) . '" alt="' . htmlspecialchars($filename) . '" />',
 
-            case 'file':
-                $url = './files/' . urlencode($filename);
-                return '<div class="file-download">
-                    <a href="' . htmlspecialchars($url) . '" download>
+            RenderMode::FILE => '<div class="file-download">
+                    <a href="' . htmlspecialchars('./files/' . urlencode($filename)) . '" download>
                         <span class="icon">📁</span> Download ' . htmlspecialchars($filename) . '
                     </a>
-                </div>';
+                </div>',
 
-            case 'file-link':
-                $url = './files/' . urlencode($filename);
-                return '<div class="file-link">
-                    <a href="' . htmlspecialchars($url) . '" target="_blank" rel="noopener">
+            RenderMode::FILE_LINK => '<div class="file-link">
+                    <a href="' . htmlspecialchars('./files/' . urlencode($filename)) . '" target="_blank" rel="noopener">
                         <span class="icon">📎</span> ' . htmlspecialchars($filename) . '
                     </a>
-                </div>';
+                </div>',
 
-            case 'link':
-                $links = array_filter(array_map('trim', explode("\n", $content)));
-                $html = '<ul class="link-list">';
-                foreach ($links as $link) {
-                    $html .= '<li><a href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">' .
-                        htmlspecialchars($link) . '</a></li>';
-                }
-                $html .= '</ul>';
-                return $html;
+            RenderMode::LINK => $this->renderLinks($content),
 
-            case 'rendered':
-                if (($fileMeta['type'] ?? '') === 'markdown') {
-                    return $this->renderMarkdown($content);
-                }
-                return '<pre>' . htmlspecialchars($content) . '</pre>';
+            RenderMode::RENDERED => ($fileMeta['type'] ?? '') === 'markdown'
+                ? $this->renderMarkdown($content)
+                : '<pre>' . htmlspecialchars($content) . '</pre>',
+        };
+    }
 
-            default:
-                return '<pre>' . htmlspecialchars($content) . '</pre>';
+    private function renderHighlighted(string $content, array $fileMeta): string
+    {
+        $type = $fileMeta['type'] ?? 'text';
+        $lineNumbersClass = !empty($fileMeta['lineNumbers']) ? ' line-numbers' : '';
+        $lineNumberStart = (int)($fileMeta['lineNumberStart'] ?? 1) ?: 1;
+        $dataAttr = $lineNumberStart !== 1 ? ' data-ln-start-from="' . $lineNumberStart . '"' : '';
+
+        return '<pre class="hljs-pre' . $lineNumbersClass . '"' . $dataAttr . '><code class="language-' . htmlspecialchars($type) . '">' .
+            htmlspecialchars($content) . '</code></pre>';
+    }
+
+    private function renderLinks(string $content): string
+    {
+        $links = array_filter(array_map('trim', explode("\n", $content)));
+        $html = '<ul class="link-list">';
+        foreach ($links as $link) {
+            $html .= '<li><a href="' . htmlspecialchars($link) . '" target="_blank" rel="noopener">' .
+                htmlspecialchars($link) . '</a></li>';
         }
+        $html .= '</ul>';
+        return $html;
     }
 
     private function renderMarkdown(string $content): string

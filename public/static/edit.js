@@ -12,8 +12,94 @@ let editConfig = {
     fileIndex: 0
 };
 
+// Cached highlight.js languages
+let hljsLanguages = null;
+
 function initEditConfig(config) {
     editConfig = { ...editConfig, ...config };
+}
+
+/**
+ * Get available highlight.js languages
+ */
+function getHighlightLanguages() {
+    if (hljsLanguages === null) {
+        hljsLanguages = hljs.listLanguages()
+            .map(lang => ({ value: lang, label: formatLanguageName(lang) }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+    }
+    return hljsLanguages;
+}
+
+function formatLanguageName(lang) {
+    // Only map names that need special formatting (symbols, acronyms, etc.)
+    const nameMap = {
+        'cpp': 'C++',
+        'csharp': 'C#',
+        'fsharp': 'F#',
+        'objectivec': 'Objective-C',
+        'javascript': 'JavaScript',
+        'typescript': 'TypeScript',
+        'coffeescript': 'CoffeeScript',
+        'actionscript': 'ActionScript',
+        'vbnet': 'VB.NET',
+        'php': 'PHP',
+        'sql': 'SQL',
+        'pgsql': 'PostgreSQL',
+        'plsql': 'PL/SQL',
+        'css': 'CSS',
+        'scss': 'SCSS',
+        'less': 'LESS',
+        'html': 'HTML',
+        'xml': 'XML',
+        'json': 'JSON',
+        'yaml': 'YAML',
+        'toml': 'TOML',
+        'ini': 'INI',
+        'http': 'HTTP',
+        'graphql': 'GraphQL',
+        'wasm': 'WebAssembly',
+        'llvm': 'LLVM IR',
+        'x86asm': 'x86 Assembly',
+        'armasm': 'ARM Assembly',
+        'avrasm': 'AVR Assembly',
+        'mipsasm': 'MIPS Assembly',
+        'glsl': 'GLSL',
+        'hlsl': 'HLSL',
+        'ocaml': 'OCaml',
+        'reasonml': 'ReasonML',
+        'sml': 'Standard ML',
+        'plaintext': 'Plain Text',
+        'bnf': 'BNF',
+        'ebnf': 'EBNF',
+        'dns': 'DNS Zone',
+        'ldif': 'LDIF',
+    };
+
+    return nameMap[lang] || lang.charAt(0).toUpperCase() + lang.slice(1);
+}
+
+/**
+ * Build type select options HTML
+ */
+function buildTypeSelectOptions(selectedValue = '') {
+    const languages = getHighlightLanguages();
+    let html = '<option value="">Auto-detect</option>';
+
+    for (const lang of languages) {
+        const selected = lang.value === selectedValue ? ' selected' : '';
+        html += `<option value="${lang.value}"${selected}>${lang.label}</option>`;
+    }
+
+    return html;
+}
+
+/**
+ * Populate a type select element with highlight.js languages
+ */
+function populateTypeSelect(selectElement, selectedValue = '') {
+    const currentValue = selectedValue || selectElement.dataset.initialValue || selectElement.value;
+    selectElement.innerHTML = buildTypeSelectOptions(currentValue);
 }
 
 // File Management
@@ -27,6 +113,9 @@ function addFile() {
     fileEditor.setAttribute('ondragover', 'handleDragOver(event)');
     fileEditor.setAttribute('ondrop', 'handleDrop(event)');
     fileEditor.setAttribute('ondragend', 'handleDragEnd(event)');
+
+    // Build type select options dynamically from highlight.js
+    const typeOptions = buildTypeSelectOptions('');
 
     fileEditor.innerHTML = `
         <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
@@ -62,29 +151,7 @@ function addFile() {
             <div class="form-group file-type-field">
                 <label>Type</label>
                 <select name="files[${editConfig.fileIndex}][type]" class="type-select">
-                    <option value="">Auto-detect</option>
-                    <option value="bash">Bash</option>
-                    <option value="c">C</option>
-                    <option value="cpp">C++</option>
-                    <option value="csharp">C#</option>
-                    <option value="css">CSS</option>
-                    <option value="diff">Diff</option>
-                    <option value="go">Go</option>
-                    <option value="html">HTML</option>
-                    <option value="java">Java</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="json">JSON</option>
-                    <option value="kotlin">Kotlin</option>
-                    <option value="markdown">Markdown</option>
-                    <option value="php">PHP</option>
-                    <option value="python">Python</option>
-                    <option value="ruby">Ruby</option>
-                    <option value="rust">Rust</option>
-                    <option value="sql">SQL</option>
-                    <option value="swift">Swift</option>
-                    <option value="typescript">TypeScript</option>
-                    <option value="xml">XML</option>
-                    <option value="yaml">YAML</option>
+                    ${typeOptions}
                 </select>
             </div>
         </div>
@@ -757,6 +824,9 @@ function showAliasError(message) {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Populate all existing type selects with dynamic highlight.js languages
+    document.querySelectorAll('.type-select').forEach(populateTypeSelect);
+
     document.querySelectorAll('.render-select').forEach(function(select) {
         updateFileFields(select);
     });

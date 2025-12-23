@@ -357,6 +357,95 @@ class Paste
         $this->saveMeta();
     }
 
+    /**
+     * Synchronize files from form submission.
+     * Handles adds, updates, renames, removes, and reordering in one operation.
+     *
+     * @param array $submittedFiles Array of file data from form, each containing:
+     *   - filename: string (new filename)
+     *   - originalFilename: ?string (original filename if editing existing file)
+     *   - content: ?string (file content, null to keep existing)
+     *   - fileMeta: array (file metadata)
+     */
+    public function syncFiles(array $submittedFiles): void
+    {
+        $existingFiles = array_keys($this->getFiles());
+        $filesToRename = [];
+        $filesToUpdate = [];
+        $filesToAdd = [];
+        $filesToRemove = [];
+        $newFilesOrder = [];
+        $submittedOriginals = [];
+
+        // First pass: categorize operations
+        foreach ($submittedFiles as $fileData) {
+            $newFilename = $fileData['filename'];
+            $originalFilename = $fileData['originalFilename'] ?? null;
+            $content = $fileData['content'] ?? null;
+            $fileMeta = $fileData['fileMeta'];
+
+            $newFilesOrder[] = $newFilename;
+
+            if ($originalFilename && in_array($originalFilename, $existingFiles)) {
+                // Existing file
+                $submittedOriginals[] = $originalFilename;
+
+                if ($originalFilename !== $newFilename) {
+                    $filesToRename[$originalFilename] = $newFilename;
+                }
+                $filesToUpdate[$newFilename] = [
+                    'content' => $content,
+                    'fileMeta' => $fileMeta,
+                    'originalFilename' => $originalFilename
+                ];
+            } else {
+                // New file
+                $filesToAdd[$newFilename] = [
+                    'content' => $content ?? '',
+                    'fileMeta' => $fileMeta
+                ];
+            }
+        }
+
+        // Determine files to remove
+        foreach ($existingFiles as $existingFile) {
+            if (!in_array($existingFile, $submittedOriginals)) {
+                $filesToRemove[] = $existingFile;
+            }
+        }
+
+        // Stage 1: Rename files to temporary names to avoid conflicts
+        $tempRenames = [];
+        foreach ($filesToRename as $oldName => $newName) {
+            $tempName = '__temp_' . uniqid() . '_' . $oldName;
+            $this->renameFile($oldName, $tempName);
+            $tempRenames[$tempName] = $newName;
+        }
+
+        // Stage 2: Rename from temp names to final names
+        foreach ($tempRenames as $tempName => $finalName) {
+            $this->renameFile($tempName, $finalName);
+        }
+
+        // Update existing files
+        foreach ($filesToUpdate as $filename => $data) {
+            $this->updateFile($filename, $data['content'], $data['fileMeta']);
+        }
+
+        // Add new files
+        foreach ($filesToAdd as $filename => $data) {
+            $this->addFile($filename, $data['content'], $data['fileMeta']);
+        }
+
+        // Remove deleted files
+        foreach ($filesToRemove as $filename) {
+            $this->removeFile($filename);
+        }
+
+        // Reorder files
+        $this->reorderFiles($newFilesOrder);
+    }
+
     public function getFile(string $filename): ?string
     {
         $filePath = $this->basePath . '/files/' . $filename;

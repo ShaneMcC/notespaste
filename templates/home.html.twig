@@ -12,7 +12,10 @@
                 <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
                 <button type="submit" class="button secondary">Rerender All</button>
             </form>
-            <a href="{{ basePath }}/logout" class="button secondary">Logout</a>
+            <form method="post" action="{{ basePath }}/logout" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
+                <button type="submit" class="button secondary">Logout</button>
+            </form>
         {% else %}
             <a href="{{ basePath }}/login" class="button">Login</a>
         {% endif %}
