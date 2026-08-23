@@ -14,7 +14,7 @@ This is a file-based pastebin application built with PHP 8.1+ that prioritizes s
 
 1. **File-based storage** - All data stored in `notes/` directory with JSON metadata
 2. **Pre-rendered HTML** - Pastes are rendered to static HTML files for fast delivery
-3. **Authentication via .htpasswd** - Simple HTTP basic auth without database overhead
+3. **Authentication via .htpasswd or OIDC** - Simple credential auth without database overhead, optionally backed by an identity provider
 4. **Template-driven rendering** - Twig templates for all pages, enabling easy customization
 
 ## Commonly Used Commands
@@ -117,6 +117,9 @@ chown -R www-data:www-data public/notes/
 # 12. Test alias deletion
 # 13. Test promoting alias to primary
 # 14. Test CSRF protection (forms should fail without token)
+# 15. Test OIDC login (button appears, round trip logs you in)
+# 16. Test OIDC + local login together (divider shown), and OIDC on its own (no password form)
+# 17. Test OIDC callback rejection (tampered state, replayed code, expired id_token)
 ```
 
 ## Project Structure
@@ -142,6 +145,7 @@ chown -R www-data:www-data public/notes/
 │   ├── Auth.php
 │   ├── Csrf.php
 │   ├── Helpers.php
+│   ├── Oidc.php
 │   ├── Paste.php
 │   ├── PasteRenderer.php
 │   ├── RenderMode.php
@@ -309,18 +313,36 @@ Implementation:
 
 ### 6. Authentication Flow
 
-Simple session-based auth with .htpasswd:
+Two ways in, both ending at the same session state.
+
+**Local (password) login:**
 
 1. User submits login form
-2. `Auth::login($username, $password)` checks against .htpasswd (bcrypt)
-3. On success, `$_SESSION['authenticated'] = true; $_SESSION['username'] = $username`
+2. `Auth::authenticate($username, $password)` checks the AUTH_* env vars, then .htpasswd (bcrypt)
+3. On success, `Auth::loginAs()` regenerates the session ID and sets `$_SESSION['username']`
 4. `Auth::isLoggedIn()` checks session state
 5. `Auth::requireLogin()` redirects to login if not authenticated
 
+**OIDC login** (only offered when `Oidc::isConfigured()`):
+
+1. User clicks "Login with {OIDC_NAME}" → `GET /login/oidc`
+2. `Oidc::getAuthorizationUrl()` fetches the discovery document, mints `state`/`nonce`/PKCE
+   verifier into the session, and returns the provider URL to redirect to
+3. Provider sends the user back to `GET /login/oidc/callback?code=...&state=...`
+4. `Oidc::handleCallback()` checks `state`, exchanges the code for tokens over the back
+   channel, verifies the `id_token`, and returns a username
+5. `Auth::loginAs($username, Auth::SOURCE_OIDC)` starts the session as above
+
+Both methods can be enabled at once. `Auth::hasLocalLogin()` reports whether password
+logins are possible at all, which is what decides if the login page shows the
+"or local login:" form.
+
 **Security notes:**
 - Sessions are PHP's default (PHPSESSID cookie)
+- `Auth::loginAs()` calls `session_regenerate_id(true)`, so both login paths are safe from session fixation
 - Passwords stored as bcrypt hashes in .htpasswd or AUTH_USER/AUTH_PASSWORD/AUTH_PASSWORD_HASH env vars
 - CSRF tokens required on all POST forms (via `Csrf` class)
+- OIDC login CSRF is handled by the one-shot `state` parameter rather than a form token
 - No rate limiting (could be added)
 
 ### 7. Display Modes
@@ -384,6 +406,13 @@ Configuration is loaded from `config/config.php` which reads environment variabl
 return [
     'htpasswd_path' => getenv('HTPASSWD_PATH') ?: __DIR__ . '/.htpasswd',
     'notes_dir' => getenv('NOTES_DIR') ?: __DIR__ . '/../public/notes',
+    'oidc' => [
+        'issuer' => getenv('OIDC_ISSUER') ?: '',
+        'client_id' => getenv('OIDC_CLIENTID') ?: '',
+        'client_secret' => getenv('OIDC_SECRET') ?: '',
+        'name' => getenv('OIDC_NAME') ?: '',
+        'redirect_uri' => getenv('OIDC_REDIRECT_URI') ?: '',
+    ],
 ];
 ```
 
@@ -397,6 +426,7 @@ This allows:
 // In public/index.php
 $config = require __DIR__ . '/../config/config.php';
 Auth::init($config['htpasswd_path']);
+Oidc::init($config['oidc']);
 Paste::setNotesDir($config['notes_dir']);
 ```
 
@@ -687,7 +717,7 @@ rm /var/lib/php/sessions/sess_*
 3. **No search** - No way to search paste content (could add with grep or search index)
 4. **No pagination** - All pastes load on homepage (could add pagination)
 5. **No API** - Only web interface available (could add JSON API)
-6. **Single user tier** - All logged-in users have same permissions (could add roles)
+6. **Single user tier** - All logged-in users have same permissions (could add roles); OIDC has no group/claim filtering, so restrict access at the provider
 7. **No paste expiration** - Pastes don't auto-delete (could add TTL)
 8. **No file size limits** - Large files can cause memory issues (could add validation)
 9. **No dark mode toggle** - Theme follows system preference only (could add manual toggle)
@@ -706,24 +736,26 @@ rm /var/lib/php/sessions/sess_*
 7. **Executable file proxy** - .htaccess forces PHP, CGI, Python, and other executable extensions through PHP proxy route to prevent direct execution
 8. **Binary content detection** - Helper function identifies binary content to prevent display issues
 9. **CSRF protection** - All POST forms require valid CSRF tokens via the `Csrf` class
+10. **Session fixation** - `Auth::loginAs()` regenerates the session ID on every successful login
+11. **OIDC** - Authorization code flow with PKCE where supported, one-shot state/nonce, full id_token signature verification against the provider's JWKS, and an asymmetric-only algorithm allowlist
 
 ### Potential Vulnerabilities
 
 1. **XSS in paste content** - Markdown and plain text are not sanitized (by design for code sharing)
-2. **Session fixation** - No session regeneration on login (should add `session_regenerate_id(true)`)
-3. **Timing attacks** - Password comparison may be vulnerable (PHP's password_verify is safe, but htpasswd parsing isn't)
-4. **No content-type validation** - Files accepted with any extension (could restrict)
+2. **Timing attacks** - Password comparison may be vulnerable (PHP's password_verify is safe, but htpasswd parsing isn't)
+3. **No content-type validation** - Files accepted with any extension (could restrict)
+4. **No OIDC authorization** - Anyone who can authenticate with the provider gets full access; there is no group or claim filtering
 
 ### Recommendations for Production
 
-1. **Enable HTTPS** - Use Let's Encrypt, enforce HTTPS redirect
-2. **Add session_regenerate_id()** - In Auth::login() after successful auth
-3. **Sanitize HTML output** - In rendered markdown mode, use HTML Purifier
-4. **Add rate limiting** - Throttle login attempts (e.g., 5 per minute per IP)
-5. **Change default credentials** - Update .htpasswd immediately after install
-6. **Restrict file types** - Only allow text-based files in uploads
-7. **Implement CSP headers** - Content Security Policy to prevent XSS
-8. **Regular backups** - Backup notes/ directory and .htpasswd
+1. **Enable HTTPS** - Use Let's Encrypt, enforce HTTPS redirect (required in practice for OIDC)
+2. **Sanitize HTML output** - In rendered markdown mode, use HTML Purifier
+3. **Add rate limiting** - Throttle login attempts (e.g., 5 per minute per IP)
+4. **Change default credentials** - Update .htpasswd immediately after install
+5. **Restrict file types** - Only allow text-based files in uploads
+6. **Implement CSP headers** - Content Security Policy to prevent XSS
+7. **Regular backups** - Backup notes/ directory and .htpasswd
+8. **Scope OIDC access** - Restrict who can log in from the provider side, since the app authorizes every authenticated user
 
 ## Testing
 
@@ -832,7 +864,7 @@ When modifying this application:
 ## File-by-File Breakdown
 
 ### composer.json
-- **Dependencies**: bramus/router, twig/twig, league/commonmark
+- **Dependencies**: bramus/router, twig/twig, league/commonmark, firebase/php-jwt (id_token verification for OIDC)
 - **Autoloading**: PSR-4 maps `App\` to `src/`
 - **Purpose**: Dependency management and class autoloading
 
@@ -855,12 +887,15 @@ When modifying this application:
 - **Line 97**: Run router
 
 ### src/Auth.php
-- **checkPassword()**: Parses .htpasswd, verifies bcrypt hashes
-- **login()**: Authenticates user, sets session variables
+- **authenticate()**: Checks AUTH_* env vars then .htpasswd (bcrypt), logs the user in on success
+- **loginAs()**: Starts a session for an already-authenticated user (regenerates the session ID); used by both the password and OIDC paths
+- **hasLocalLogin()**: Whether password logins are possible at all (AUTH_* set, or .htpasswd has entries)
+- **htpasswdEntries()**: Parses .htpasswd into [username, hash] pairs, skipping comments and malformed lines
 - **logout()**: Destroys session
 - **isLoggedIn()**: Checks session state
+- **getCurrentUser()**: Returns current username from session
+- **getAuthSource()**: How the current user logged in (`SOURCE_LOCAL` or `SOURCE_OIDC`)
 - **requireLogin()**: Redirects to login if not authenticated
-- **getUsername()**: Returns current username from session
 
 ### src/Csrf.php
 - **generateToken()**: Creates a new CSRF token and stores in session
@@ -869,6 +904,28 @@ When modifying this application:
 - **validateRequest()**: Validates CSRF token from POST data or header
 - **requireValidToken()**: Halts execution if token is invalid
 - **getHiddenInput()**: Returns HTML hidden input element with token
+
+### src/Oidc.php
+OpenID Connect authorization code flow. Everything is static and driven by the config
+array passed to `init()`; the whole feature stays dormant unless all four required
+settings are present.
+
+- **init()**: Stores the config (issuer, client_id, client_secret, name, redirect_uri)
+- **isConfigured()**: True only when issuer, client_id, client_secret and name are all non-empty
+- **getName()**: Provider display name, used for the login button
+- **getAuthorizationUrl()**: Builds the provider URL, stashing `state`, `nonce` and the PKCE verifier in the session
+- **handleCallback()**: Validates `state`, exchanges the code, verifies the id_token, returns a username
+- **getRedirectUri()**: The callback URL - `OIDC_REDIRECT_URI` if set, otherwise derived from the request (honouring `X-Forwarded-Proto`/`X-Forwarded-Host`)
+- **exchangeCode()**: Back-channel token request, using `client_secret_basic` or `client_secret_post` depending on what discovery advertises
+- **verifyIdToken()**: Pins the algorithm to an asymmetric allowlist, verifies the signature against the JWKS, then checks iss/aud/azp/nonce/sub (exp/nbf/iat come from the JWT library)
+- **fetchUserInfo()**: Optional extra claims from the userinfo endpoint; a network failure degrades gracefully, but a `sub` mismatch is fatal
+- **resolveUsername()**: Picks `preferred_username`, `email`, `name` or `sub`, in that order
+- **discover()**: Fetches and session-caches the `.well-known/openid-configuration` document (1 hour TTL)
+
+**Notes for future changes:**
+- Requested scopes are fixed at `openid profile email` (`Oidc::SCOPE`)
+- Never widen `ALLOWED_ALGS` to include HMAC algorithms - the JWKS is public, so an HS256 id_token would be forgeable
+- The callback route is `/login/oidc/callback`; changing it means re-registering the redirect URI with every provider
 
 ### src/Paste.php
 - **generateId()**: Creates random 20-30 char alphanumeric ID
@@ -948,9 +1005,12 @@ When modifying this application:
 - **Submit**: POST to /notes/new or /notes/{id}/edit
 
 ### templates/login.html.twig
-- **Simple form**: Username and password fields
+- **OIDC button**: "Login with {OIDC_NAME}" shown first when `oidcEnabled`
+- **Divider**: "or local login:" between the two, only when both are available
+- **Simple form**: Username and password fields, shown when `localLoginEnabled`
 - **Error display**: Shows authentication errors
 - **POST target**: /login
+- Renders "No login methods are configured." if neither is set up
 
 ### templates/rerender-results.html.twig
 - **Results table**: Shows each paste with success/failure status
@@ -1013,6 +1073,8 @@ Before deploying to production:
 - [ ] Check for XSS vulnerabilities in content
 - [ ] Test paste deletion
 - [ ] Test alias functionality
+- [ ] Verify the OIDC redirect URI registered with the provider matches the deployed URL
+- [ ] Confirm the reverse proxy sends X-Forwarded-Proto/Host, or set OIDC_REDIRECT_URI
 
 ### Docker Deployment
 

@@ -37,7 +37,7 @@ Feel free to raise issues for things and I may in time decide to get to it.
 - **Line numbers** - Optional line numbers for syntax-highlighted code
 - **Flexible file display** - Collapsed sections, custom display names, descriptions
 - **Clean URLs** - SEO-friendly URLs with mod_rewrite
-- **Authentication** - Simple .htpasswd-based or env-var based login
+- **Authentication** - Simple .htpasswd-based or env-var based login, or OIDC single sign-on
 - **CSRF protection** - Secure forms with CSRF tokens
 - **Template rendering** - Pre-rendered HTML for fast delivery
 - **Docker support** - Easy containerized deployment
@@ -73,9 +73,19 @@ The application can be configured via environment variables:
 - `AUTH_PASSWORD_HASH` - Bcrypt password hash (recommended, takes priority over `AUTH_PASSWORD`)
 - `AUTH_PASSWORD` - Plain text password (simpler, less secure)
 
+**OIDC / single sign-on (optional):**
+- `OIDC_ISSUER` - Issuer URL of the provider (e.g. `https://auth.example.com`)
+- `OIDC_CLIENTID` - Client ID registered with the provider
+- `OIDC_SECRET` - Client secret
+- `OIDC_NAME` - Display name for the login button (e.g. `Authentik`)
+- `OIDC_REDIRECT_URI` - Override the callback URL (optional, normally detected from the request)
+
+All four of `OIDC_ISSUER`, `OIDC_CLIENTID`, `OIDC_SECRET` and `OIDC_NAME` must be set,
+otherwise OIDC stays switched off.
+
 ### Authentication Methods
 
-The application supports two authentication methods that can be used together:
+The application supports three authentication methods that can be used together:
 
 1. **Environment Variables** (recommended for Docker):
    ```bash
@@ -102,7 +112,38 @@ The application supports two authentication methods that can be used together:
    - Format: `username:$2y$10$...` (one per line)
    - Generate with: `htpasswd -nbB username password`
 
-Both methods can coexist - the application will check environment variables first, then fall back to the .htpasswd file.
+3. **OIDC / Single Sign-On** (optional):
+   ```bash
+   docker run -d \
+     -e OIDC_ISSUER=https://auth.example.com/application/o/notespaste/ \
+     -e OIDC_CLIENTID=notespaste \
+     -e OIDC_SECRET=your-client-secret \
+     -e OIDC_NAME='Company SSO' \
+     pastebin:latest
+   ```
+
+   Register the application with your identity provider as a **confidential client**
+   using the **authorization code** flow, and set its redirect URI to:
+
+   ```
+   https://your-pastebin.example.com/login/oidc/callback
+   ```
+
+   (add your base path in front of `/login` if the app is installed in a subdirectory).
+   The requested scopes are `openid profile email`. The username comes from the
+   `preferred_username` claim, falling back to `email`, `name`, then `sub`.
+
+   When OIDC is configured the login page leads with a `Login with <OIDC_NAME>`
+   button, and the username/password form appears underneath it as "or local login:"
+   - but only if local logins are actually available. Configure OIDC on its own and
+   the password form disappears entirely.
+
+   If the app sits behind a reverse proxy, it uses `X-Forwarded-Proto` and
+   `X-Forwarded-Host` to build the callback URL. Set `OIDC_REDIRECT_URI` explicitly
+   if your proxy does not send those.
+
+All three methods can coexist - for password logins the application will check
+environment variables first, then fall back to the .htpasswd file.
 
 ## Usage
 
@@ -188,4 +229,5 @@ In addition to pasting text content, you can upload files directly:
 - `_meta.json` and `_alias.json` files are blocked from direct access
 - Directory listings are disabled
 - **CSRF protection** - All forms are protected with CSRF tokens
+- **OIDC hardening** - Authorization code flow with PKCE (where the provider supports it), one-shot `state` and `nonce` values, full `id_token` signature verification against the provider's JWKS, and issuer/audience/expiry checks. HMAC-signed and unsigned tokens are rejected outright.
 - **Executable file protection** - While most files can be directly accessed (if the notes directory is under `/app/public`), we forcefully proxy PHP, CGI, Python, and certain other executable files through the application to prevent execution.

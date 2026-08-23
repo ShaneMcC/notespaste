@@ -13,11 +13,20 @@
 </div>
 {% endif %}
 
+{% if oidcEnabled %}
+    <a href="{{ basePath }}/login/oidc" class="button login-primary">Login with {{ oidcName }}</a>
+
+    {% if localLoginEnabled %}
+        <div class="login-divider"><span>or local login:</span></div>
+    {% endif %}
+{% endif %}
+
+{% if localLoginEnabled %}
 <form method="post" action="{{ basePath }}/login">
     <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
     <div class="form-group">
         <label for="username">Username</label>
-        <input type="text" id="username" name="username" required autofocus>
+        <input type="text" id="username" name="username" required{% if not oidcEnabled %} autofocus{% endif %}>
     </div>
 
     <div class="form-group">
@@ -27,4 +36,7 @@
 
     <button type="submit">Login</button>
 </form>
+{% elseif not oidcEnabled %}
+<p>No login methods are configured.</p>
+{% endif %}
 {% endblock %}

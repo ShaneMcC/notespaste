@@ -406,6 +406,32 @@ footer {
     margin: 30px 0;
 }
 
+/* Login page */
+.login-primary {
+    display: block;
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 16px;
+    text-align: center;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+    color: var(--text-tertiary);
+    font-size: 14px;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-primary);
+}
+
 /* Home page paste list */
 .paste-list {
     list-style: none;

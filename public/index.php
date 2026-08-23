@@ -11,9 +11,13 @@ use App\Helpers;
 use App\Csrf;
 use App\TwigFactory;
 use App\RenderMode;
+use App\Oidc;
 
 // Initialize authentication
 Auth::init($config['htpasswd_path']);
+
+// Initialize OIDC (stays disabled unless fully configured)
+Oidc::init($config['oidc']);
 
 // Initialize Paste with notes directory
 Paste::setNotesDir($config['notes_dir']);
@@ -118,7 +122,10 @@ $router->get('/login', function() use ($twig) {
     }
 
     echo $twig->render('login.html.twig', [
-        'error' => $_SESSION['login_error'] ?? null
+        'error' => $_SESSION['login_error'] ?? null,
+        'oidcEnabled' => Oidc::isConfigured(),
+        'oidcName' => Oidc::getName(),
+        'localLoginEnabled' => Auth::hasLocalLogin(),
     ]);
     unset($_SESSION['login_error']);
 });
@@ -136,6 +143,44 @@ $router->post('/login', function() {
         $_SESSION['login_error'] = 'Invalid username or password';
         Helpers::redirect(BASE_PATH . '/login');
     }
+});
+
+// Start an OIDC login - hand the user off to the identity provider
+$router->get('/login/oidc', function() {
+    if (!Oidc::isConfigured()) {
+        Helpers::show404();
+    }
+
+    if (Auth::isLoggedIn()) {
+        Helpers::redirect(BASE_PATH . '/');
+    }
+
+    try {
+        Helpers::redirect(Oidc::getAuthorizationUrl());
+    } catch (\Exception $e) {
+        error_log('OIDC: could not start login: ' . $e->getMessage());
+        $_SESSION['login_error'] = 'Could not reach the ' . Oidc::getName() . ' login service.';
+        Helpers::redirect(BASE_PATH . '/login');
+    }
+});
+
+// OIDC callback - the provider sends the user back here with an auth code
+$router->get('/login/oidc/callback', function() {
+    if (!Oidc::isConfigured()) {
+        Helpers::show404();
+    }
+
+    try {
+        $username = Oidc::handleCallback($_GET);
+    } catch (\Exception $e) {
+        error_log('OIDC: login failed: ' . $e->getMessage());
+        $_SESSION['login_error'] = 'Login with ' . Oidc::getName() . ' failed.';
+        Helpers::redirect(BASE_PATH . '/login');
+        return;
+    }
+
+    Auth::loginAs($username, Auth::SOURCE_OIDC);
+    Helpers::redirect(BASE_PATH . '/');
 });
 
 // Logout
