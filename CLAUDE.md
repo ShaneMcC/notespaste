@@ -103,13 +103,20 @@ chown -R www-data:www-data public/notes/
 ```bash
 # Currently no automated tests
 # Manual testing checklist:
-# 1. Create new paste
-# 2. Edit existing paste
-# 3. Test all render modes (plain, highlighted, rendered, image, file, file-link, link)
-# 4. Test file uploads
-# 5. Test public/private visibility
-# 6. Test login/logout
-# 7. Test rerender functionality
+# 1. Create new paste (with random ID)
+# 2. Create new paste with custom ID
+# 3. Edit existing paste
+# 4. Delete paste
+# 5. Test all render modes (plain, highlighted, rendered, image, file, file-link, link)
+# 6. Test file uploads
+# 7. Test public/private visibility
+# 8. Test login/logout
+# 9. Test rerender functionality
+# 10. Test line numbers (highlighted mode)
+# 11. Test alias creation (random and custom)
+# 12. Test alias deletion
+# 13. Test promoting alias to primary
+# 14. Test CSRF protection (forms should fail without token)
 ```
 
 ## Project Structure
@@ -123,8 +130,9 @@ chown -R www-data:www-data public/notes/
 ├── public/                 # Web root directory
 │   ├── index.php          # Main routing file
 │   ├── .htaccess          # Apache rewrite rules
-│   ├── static/            # CSS and static assets
-│   │   └── style.css
+│   ├── static/            # CSS and JavaScript assets
+│   │   ├── style.css
+│   │   └── edit.js        # Edit page JavaScript
 │   └── notes/             # Paste storage
 │       └── {paste-id}/
 │           ├── _meta.json
@@ -132,9 +140,12 @@ chown -R www-data:www-data public/notes/
 │           └── {slug}.html
 ├── src/                   # PHP classes (PSR-4: App\)
 │   ├── Auth.php
+│   ├── Csrf.php
+│   ├── Helpers.php
 │   ├── Paste.php
 │   ├── PasteRenderer.php
-│   └── Helpers.php
+│   ├── RenderMode.php
+│   └── TwigFactory.php
 ├── templates/             # Twig templates
 │   ├── base.html.twig
 │   ├── home.html.twig
@@ -157,10 +168,13 @@ chown -R www-data:www-data public/notes/
 
 **Why:** Simplicity, portability, no database setup required.
 
-Each paste is stored as a directory with a random 20-30 character alphanumeric ID:
+Each paste is stored as a directory with either a random 20-30 character alphanumeric ID or a user-specified custom ID:
 ```
-notes/caith6XaePeeKi0queic/
+notes/caith6XaePeeKi0queic/    # Random ID
+notes/my-custom-paste/          # Custom ID (alphanumeric, hyphens, underscores, max 64 chars)
+notes/alias-to-paste/           # Alias directory (contains only _alias.json)
   ├── _meta.json           # Metadata and file list
+  ├── _alias.json          # Only present for aliases, points to parent paste
   ├── files/               # Uploaded files
   │   ├── example.md
   │   └── script.php
@@ -180,6 +194,7 @@ notes/caith6XaePeeKi0queic/
   "selectedFile": "example.md",
   "createdAt": "2025-01-15T10:30:00+00:00",
   "updatedAt": "2025-01-15T14:20:00+00:00",
+  "aliases": ["my-short-url", "another-alias"],
   "files": {
     "example.md": {
       "displayName": "My Example",
@@ -199,9 +214,18 @@ notes/caith6XaePeeKi0queic/
       "hidden": false,
       "unwrapped": false,
       "collapsed": true,
-      "collapsedDescription": "PHP utility script"
+      "collapsedDescription": "PHP utility script",
+      "lineNumbers": true,
+      "lineNumberStart": 1
     }
   }
+}
+```
+
+**_alias.json structure (for alias directories):**
+```json
+{
+  "parent": "caith6XaePeeKi0queic"
 }
 ```
 
@@ -296,7 +320,7 @@ Simple session-based auth with .htpasswd:
 **Security notes:**
 - Sessions are PHP's default (PHPSESSID cookie)
 - Passwords stored as bcrypt hashes in .htpasswd or AUTH_USER/AUTH_PASSWORD/AUTH_PASSWORD_HASH env vars
-- No CSRF tokens (could be added)
+- CSRF tokens required on all POST forms (via `Csrf` class)
 - No rate limiting (could be added)
 
 ### 7. Display Modes
@@ -333,7 +357,9 @@ Each file in `_meta.json` has additional metadata beyond filename and render mod
     "hidden": false,                        // Hide in multi-file mode
     "unwrapped": false,                     // Render without wrapper/header
     "collapsed": true,                      // Start collapsed (multi-file)
-    "collapsedDescription": "Click to expand" // Shown when collapsed
+    "collapsedDescription": "Click to expand", // Shown when collapsed
+    "lineNumbers": true,                    // Show line numbers (highlighted mode only)
+    "lineNumberStart": 1                    // Starting line number
   }
 }
 ```
@@ -345,6 +371,8 @@ Each file in `_meta.json` has additional metadata beyond filename and render mod
 - `collapsedDescription` - Brief summary visible even when collapsed
 - `displayName` - Override filename in headers (useful for long/technical filenames)
 - `description` - Explanatory text shown above file content
+- `lineNumbers: true` - Show line numbers in the gutter (only for `highlighted` render mode)
+- `lineNumberStart` - Start line numbering from a specific number (default: 1)
 
 ### 9. Configuration System
 
@@ -372,7 +400,35 @@ Auth::init($config['htpasswd_path']);
 Paste::setNotesDir($config['notes_dir']);
 ```
 
-### 10. Theme Support
+### 10. Paste Aliases and Custom IDs
+
+**Why:** Allow memorable URLs and multiple access points to the same paste.
+
+**Custom Paste IDs:**
+When creating a paste, users can specify a custom ID instead of accepting a random one:
+- Must be alphanumeric with hyphens and underscores only
+- Maximum 64 characters
+- Must be unique (not conflict with existing paste IDs or aliases)
+
+**Aliases:**
+A paste can have multiple aliases that redirect to the same content:
+- Each alias is a directory containing only `_alias.json`
+- The `_alias.json` contains `{"parent": "real-paste-id"}`
+- Aliases can be promoted to become the primary ID
+- When promoted, the old primary ID becomes an alias
+
+**Implementation:**
+- `Paste::idExists($id)` - Checks if any ID (paste or alias) exists
+- `Paste::exists($id)` - Checks if ID is a real paste (has `_meta.json`)
+- `Paste::isAlias($id)` - Checks if ID is an alias (has `_alias.json`)
+- `Paste::resolveAlias($id)` - Returns parent ID for an alias
+- `Paste::getRealId($id)` - Resolves alias to real ID, or returns same ID
+- `$paste->addAlias($aliasId)` - Add a new alias to a paste
+- `$paste->removeAlias($aliasId)` - Remove an alias
+- `$paste->makePrimary($aliasId)` - Promote an alias to be the primary ID
+- `$paste->getAliases()` - Get all aliases for a paste
+
+### 11. Theme Support
 
 **Why:** Provide comfortable viewing in different lighting conditions.
 
@@ -626,31 +682,30 @@ rm /var/lib/php/sessions/sess_*
 
 ## Known Limitations
 
-1. **No CSRF protection** - Forms don't have CSRF tokens (could add)
-2. **No rate limiting** - Login attempts not throttled (could add)
-3. **No paste deletion** - Once created, pastes exist forever (could add delete route)
-4. **No edit history** - Edits overwrite previous version (could add versioning)
-5. **No search** - No way to search paste content (could add with grep or search index)
-6. **No pagination** - All pastes load on homepage (could add pagination)
-7. **No API** - Only web interface available (could add JSON API)
-8. **Single user tier** - All logged-in users have same permissions (could add roles)
-9. **No paste expiration** - Pastes don't auto-delete (could add TTL)
-10. **No file size limits** - Large files can cause memory issues (could add validation)
-11. **No dark mode toggle** - Theme follows system preference only (could add manual toggle)
-12. **No content-type restrictions** - Any file type accepted (could whitelist extensions)
+1. **No rate limiting** - Login attempts not throttled (could add)
+2. **No edit history** - Edits overwrite previous version (could add versioning)
+3. **No search** - No way to search paste content (could add with grep or search index)
+4. **No pagination** - All pastes load on homepage (could add pagination)
+5. **No API** - Only web interface available (could add JSON API)
+6. **Single user tier** - All logged-in users have same permissions (could add roles)
+7. **No paste expiration** - Pastes don't auto-delete (could add TTL)
+8. **No file size limits** - Large files can cause memory issues (could add validation)
+9. **No dark mode toggle** - Theme follows system preference only (could add manual toggle)
+10. **No content-type restrictions** - Any file type accepted (could whitelist extensions)
 
 ## Security Considerations
 
 ### Current Security Measures
 
 1. **Private pastes are security through obscurity** - Pre-rendered HTML is accessible to anyone with the URL. "Private" only hides from homepage listing.
-2. **_meta.json blocked** - .htaccess prevents direct access: `RewriteRule ^notes/.*/_meta\.json$ - [F,L]`
+2. **_meta.json and _alias.json blocked** - .htaccess prevents direct access to metadata files
 3. **Directory indexes disabled** - `Options -Indexes` in .htaccess
 4. **Password hashing** - bcrypt via .htpasswd
 5. **Session-based auth** - PHP sessions for authentication state (only affects admin UI, not paste viewing)
 6. **File path validation** - Filenames sanitized to prevent directory traversal
 7. **Executable file proxy** - .htaccess forces PHP, CGI, Python, and other executable extensions through PHP proxy route to prevent direct execution
 8. **Binary content detection** - Helper function identifies binary content to prevent display issues
+9. **CSRF protection** - All POST forms require valid CSRF tokens via the `Csrf` class
 
 ### Potential Vulnerabilities
 
@@ -663,14 +718,12 @@ rm /var/lib/php/sessions/sess_*
 
 1. **Enable HTTPS** - Use Let's Encrypt, enforce HTTPS redirect
 2. **Add session_regenerate_id()** - In Auth::login() after successful auth
-3. **Add CSRF tokens** - Use hidden input in forms, validate on POST
-4. **Sanitize HTML output** - In rendered markdown mode, use HTML Purifier
-5. **Add rate limiting** - Throttle login attempts (e.g., 5 per minute per IP)
-6. **Change default credentials** - Update .htpasswd immediately after install
-7. **Restrict file types** - Only allow text-based files in uploads
-8. **Add paste deletion** - Allow users to delete their own pastes
-9. **Implement CSP headers** - Content Security Policy to prevent XSS
-10. **Regular backups** - Backup notes/ directory and .htpasswd
+3. **Sanitize HTML output** - In rendered markdown mode, use HTML Purifier
+4. **Add rate limiting** - Throttle login attempts (e.g., 5 per minute per IP)
+5. **Change default credentials** - Update .htpasswd immediately after install
+6. **Restrict file types** - Only allow text-based files in uploads
+7. **Implement CSP headers** - Content Security Policy to prevent XSS
+8. **Regular backups** - Backup notes/ directory and .htpasswd
 
 ## Testing
 
@@ -708,20 +761,18 @@ class AuthTest extends TestCase
 
 Potential features to add:
 
-1. **Paste deletion** - Allow users to delete their own pastes
-2. **Edit history** - Version control for pastes (store previous _meta.json)
-3. **Search** - Full-text search across paste content
-4. **Pagination** - Limit homepage to 20 pastes, add pagination
-5. **File uploads** - Support binary file uploads (images, PDFs, etc.)
-6. **Paste cloning** - "Fork" existing paste to create new version
-7. **Syntax themes** - Multiple highlight.js themes
-8. **Export** - Download paste as .zip archive
-9. **API** - JSON API for programmatic access
-10. **Webhooks** - Notify external services on paste create/update
-11. **Markdown preview** - Live preview when editing markdown
-12. **Paste templates** - Pre-defined file structures
-13. **Collaboration** - Multiple users can edit same paste
-14. **Comments** - Allow commenting on pastes
+1. **Edit history** - Version control for pastes (store previous _meta.json)
+2. **Search** - Full-text search across paste content
+3. **Pagination** - Limit homepage to 20 pastes, add pagination
+4. **Paste cloning** - "Fork" existing paste to create new version
+5. **Syntax themes** - Multiple highlight.js themes
+6. **Export** - Download paste as .zip archive
+7. **API** - JSON API for programmatic access
+8. **Webhooks** - Notify external services on paste create/update
+9. **Markdown preview** - Live preview when editing markdown
+10. **Paste templates** - Pre-defined file structures
+11. **Collaboration** - Multiple users can edit same paste
+12. **Comments** - Allow commenting on pastes
 
 ## Contributing Guidelines
 
@@ -811,14 +862,33 @@ When modifying this application:
 - **requireLogin()**: Redirects to login if not authenticated
 - **getUsername()**: Returns current username from session
 
+### src/Csrf.php
+- **generateToken()**: Creates a new CSRF token and stores in session
+- **getToken()**: Returns current token or generates new one
+- **validateToken()**: Validates a token against session token
+- **validateRequest()**: Validates CSRF token from POST data or header
+- **requireValidToken()**: Halts execution if token is invalid
+- **getHiddenInput()**: Returns HTML hidden input element with token
+
 ### src/Paste.php
 - **generateId()**: Creates random 20-30 char alphanumeric ID
+- **create()**: Creates new paste with optional custom ID
 - **__construct()**: Loads existing paste or creates new
 - **save()**: Writes metadata and files to disk, triggers render
 - **render()**: Calls PasteRenderer to generate HTML
 - **listAll()**: Returns all pastes (with public/private filtering)
 - **getHtmlUrl()**: Returns URL to rendered HTML
-- **delete()**: Not implemented (future enhancement)
+- **delete()**: Deletes paste and all its aliases
+- **idExists()**: Checks if ID exists as paste or alias
+- **exists()**: Checks if ID is a real paste
+- **isAlias()**: Checks if ID is an alias
+- **resolveAlias()**: Resolves alias to parent paste ID
+- **getRealId()**: Returns real ID, resolving aliases
+- **addAlias()**: Creates a new alias for the paste
+- **removeAlias()**: Removes an alias
+- **makePrimary()**: Promotes an alias to be the primary ID
+- **getAliases()**: Returns all aliases for the paste
+- **syncFiles()**: Handles file adds, updates, renames, removes in one operation
 
 ### src/PasteRenderer.php
 - **render()**: Main rendering entry point, returns HTML
@@ -836,6 +906,24 @@ When modifying this application:
 - **getMimeType()**: Determines MIME type from filename
 - **redirect()**: HTTP redirect helper
 - **errorPage()**: Renders error page with code and message
+- **isBinaryContent()**: Detects if content is binary data
+
+### src/RenderMode.php
+- PHP enum defining all render modes (`plain`, `highlighted`, `rendered`, `image`, `file`, `file-link`, `link`)
+- **label()**: Human-readable label for each mode
+- **hidesTypeSelector()**: Whether mode hides the type dropdown
+- **hidesContentField()**: Whether mode hides the content textarea
+- **showsLineNumbers()**: Whether mode supports line numbers option
+- **autoType()**: Auto-set type value for certain modes
+- **options()**: Returns all modes as array for select elements
+- **values()**: Returns all mode values as array
+- **isValid()**: Validates if a string is a valid mode
+
+### src/TwigFactory.php
+- Singleton factory for Twig template engine
+- **create()**: Creates or returns Twig instance with optional basePath
+- **getInstance()**: Returns existing Twig instance
+- **setTemplatesDir()**: Override templates directory
 
 ### templates/base.html.twig
 - **Base layout**: HTML structure, CSS link, blocks for title/content/scripts
@@ -874,6 +962,15 @@ When modifying this application:
 - **Component styles**: Buttons, forms, paste lists, headers
 - **Button fixes**: Ensures `<button>` and `<a.button>` same height
 - **Responsive**: Basic mobile-friendly styles
+- **Line numbers**: Styling for code line numbers in highlighted mode
+
+### static/edit.js
+- **File editor management**: Add, remove, reorder files via drag-and-drop
+- **Render mode handling**: Show/hide fields based on render mode selection
+- **File uploads**: Handle file selection and drag-drop uploads
+- **Alias management**: Add, remove, and promote aliases
+- **Dynamic form generation**: Create file entry HTML from templates
+- **Language type selector**: Populated from `hljs.listLanguages()`
 
 ## Performance Considerations
 
@@ -909,12 +1006,13 @@ Before deploying to production:
 - [ ] Set up automated backups of notes/ directory
 - [ ] Configure firewall rules
 - [ ] Add rate limiting to login endpoint
-- [ ] Implement CSRF protection
 - [ ] Add Content Security Policy headers
 - [ ] Test all render modes work correctly
 - [ ] Verify public/private paste visibility
 - [ ] Test rerender functionality
 - [ ] Check for XSS vulnerabilities in content
+- [ ] Test paste deletion
+- [ ] Test alias functionality
 
 ### Docker Deployment
 

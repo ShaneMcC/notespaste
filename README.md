@@ -20,8 +20,11 @@ Feel free to raise issues for things and I may in time decide to get to it.
 - **File-based storage** - No database required
 - **Multi-file pastes** - Each paste can contain multiple files
 - **Public/Private pastes** - Control visibility of your pastes
+- **Custom paste IDs** - Use memorable URLs instead of random IDs
+- **Paste aliases** - Multiple URLs pointing to the same paste
+- **Paste deletion** - Remove pastes you no longer need
 - **File uploads** - Upload text files, images, and binary files
-- **Display modes** - Single-file or multi-file layouts, fixed-width or wide screen.
+- **Display modes** - Single-file or multi-file layouts, fixed-width or wide screen
 - **File organization** - Drag-and-drop reordering, hide/collapse options
 - **Multiple render modes:**
   - Plain text
@@ -31,9 +34,11 @@ Feel free to raise issues for things and I may in time decide to get to it.
   - File downloads
   - File links (view in browser)
   - URL lists
+- **Line numbers** - Optional line numbers for syntax-highlighted code
 - **Flexible file display** - Collapsed sections, custom display names, descriptions
 - **Clean URLs** - SEO-friendly URLs with mod_rewrite
 - **Authentication** - Simple .htpasswd-based or env-var based login
+- **CSRF protection** - Secure forms with CSRF tokens
 - **Template rendering** - Pre-rendered HTML for fast delivery
 - **Docker support** - Easy containerized deployment
 - **Dark mode** - Automatic theme based on system preference
@@ -115,12 +120,15 @@ Both methods can coexist - the application will check environment variables firs
 
 ### Paste Features
 - **Title** - Required, used in URL slug
+- **Custom ID** - Optional, use a memorable URL instead of random ID
 - **Summary** - Optional, shown in paste listings
 - **Description** - Optional, shown at the top of the paste
 - **Author** - Defaults to your username
 - **Public/Private** - Control if pastes are visible by default
 - **Display Mode** - How to display the paste (see Display Modes below)
 - **Multiple files** - Add as many files as needed
+- **Aliases** - Create multiple URLs for the same paste
+- **Delete** - Remove pastes you no longer need
 
 ## Display Modes
 
@@ -150,7 +158,7 @@ Each file in a paste can be configured with these options:
 
 ### Render Modes
 - **Plain** - Raw text in `<pre>` block
-- **Highlighted** - Syntax highlighting (specify language in "Type")
+- **Highlighted** - Syntax highlighting (specify language in "Type"), with optional line numbers
 - **Rendered** - Render markdown to HTML
 - **Image** - Display image inline
 - **File Download** - Provide download link with download attribute
@@ -177,6 +185,7 @@ In addition to pasting text content, you can upload files directly:
 
 ### Current Security Measures
 - **Private pastes are security through obscurity** - Private pastes are not password protected. They are only hidden from the homepage listing. Anyone with the full URL can view the pre-rendered HTML file directly.
-- `_meta.json` files are blocked from direct access
+- `_meta.json` and `_alias.json` files are blocked from direct access
 - Directory listings are disabled
+- **CSRF protection** - All forms are protected with CSRF tokens
 - **Executable file protection** - While most files can be directly accessed (if the notes directory is under `/app/public`), we forcefully proxy PHP, CGI, Python, and certain other executable files through the application to prevent execution.
