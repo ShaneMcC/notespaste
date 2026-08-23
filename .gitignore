@@ -1,3 +1,4 @@
 config/.htpasswd
 public/notes/
 vendor/
+config/config.local.php

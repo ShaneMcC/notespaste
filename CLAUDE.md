@@ -127,9 +127,11 @@ chown -R www-data:www-data public/notes/
 ```
 /
 ├── config/                  # Configuration directory
-│   ├── config.php          # Main configuration
-│   ├── .htpasswd           # User credentials (bcrypt hashed)
-│   └── .htpasswd.example   # Example credentials file
+│   ├── config.php                 # Main configuration
+│   ├── config.local.php           # Local overrides (gitignored, optional)
+│   ├── config.local.example.php   # Template for config.local.php
+│   ├── .htpasswd                  # User credentials (bcrypt hashed)
+│   └── .htpasswd.example          # Example credentials file
 ├── public/                 # Web root directory
 │   ├── index.php          # Main routing file
 │   ├── .htaccess          # Apache rewrite rules
@@ -420,6 +422,26 @@ This allows:
 - Docker deployments to mount volumes at custom paths
 - Development environments to use different locations
 - Testing environments to use temporary directories
+
+**Local overrides:**
+
+`config/config.php` then merges in `config/config.local.php` if that file exists.
+It is gitignored and listed in `.dockerignore`, so it only ever applies when the
+app is run directly (`php -S localhost:8000 -t public/`) rather than in a container.
+
+```php
+// config/config.local.php
+return [
+    'oidc' => ['issuer' => 'https://auth.example.com', 'name' => 'Local SSO'],
+];
+```
+
+The merge uses `array_replace_recursive()`, so a partial nested array only replaces
+the keys it names - the example above leaves `oidc.client_id` and friends intact.
+Values here win over the environment variables. A `config.local.php` that returns
+anything other than an array throws, rather than being silently ignored.
+
+`config/config.local.example.php` is the tracked template users copy from.
 
 **Initialization:**
 ```php

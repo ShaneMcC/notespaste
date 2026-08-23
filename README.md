@@ -60,7 +60,9 @@ docker run -d \
 
 ### Configuration
 
-The application can be configured via environment variables:
+The application can be configured via environment variables, or - when running
+outside Docker - via a local config file (see
+[Local Development](#local-development) below):
 
 #### Environment Variables
 
@@ -144,6 +146,42 @@ The application supports three authentication methods that can be used together:
 
 All three methods can coexist - for password logins the application will check
 environment variables first, then fall back to the .htpasswd file.
+
+## Local Development
+
+For local development it is usually easier to keep settings in a file than to
+export environment variables every time. Copy the example and edit it:
+
+```bash
+composer install
+cp config/config.local.example.php config/config.local.php
+php -S localhost:8000 -t public/
+```
+
+`config/config.local.php` is gitignored and excluded from the Docker image, so it
+only applies when you run the app directly like this.
+
+It returns a partial config array that is merged over the defaults, so you only
+list what you want to change. Nested settings are merged too - overriding one
+`oidc` key leaves the others alone:
+
+```php
+<?php
+
+return [
+    'notes_dir' => __DIR__ . '/../public/notes',
+
+    'oidc' => [
+        'issuer' => 'https://auth.example.com',
+        'client_id' => 'notespaste',
+        'client_secret' => 'your-client-secret',
+        'name' => 'Company SSO',
+        'redirect_uri' => 'http://localhost:8000/login/oidc/callback',
+    ],
+];
+```
+
+These values take priority over the equivalent environment variables.
 
 ## Usage
 

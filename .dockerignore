@@ -3,3 +3,4 @@ public/notes
 .github
 Dockerfile
 vendor/
+config/config.local.php
