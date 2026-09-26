@@ -103,7 +103,7 @@ chown -R www-data:www-data public/notes/
 ```bash
 # Currently no automated tests
 # Manual testing checklist:
-# 1. Create new paste (with random ID)
+# 1. Create new paste (with random ID) in simple mode, and again in advanced mode
 # 2. Create new paste with custom ID
 # 3. Edit existing paste
 # 4. Delete paste
@@ -120,6 +120,8 @@ chown -R www-data:www-data public/notes/
 # 15. Test OIDC login (button appears, round trip logs you in)
 # 16. Test OIDC + local login together (divider shown), and OIDC on its own (no password form)
 # 17. Test OIDC callback rejection (tampered state, replayed code, expired id_token)
+# 18. Test simple/advanced toggle (switching keeps content; simple disabled with 2+ files;
+#     filename follows type/upload as file.<ext>)
 ```
 
 ## Project Structure
@@ -1022,9 +1024,33 @@ settings are present.
 
 ### templates/edit.html.twig
 - **Form fields**: Title, summary, slug, description, author, public checkbox
+- **More details**: Summary, description and author sit in a collapsible `<details>`
 - **File inputs**: Filename, content, render mode, type
+- **Mode toggle**: Simple/Advanced (see below)
 - **Dynamic**: JavaScript to add more files
 - **Submit**: POST to /notes/new or /notes/{id}/edit
+
+### Simple/Advanced editor mode
+
+The edit page has a client-side Simple/Advanced toggle (`setEditorMode()` in `edit.js`).
+There is only one form; simple mode adds a `simple-mode` class to it, which hides every
+element marked `advanced-only` and shows `simple-only` ones. `syncSimpleMode()` then keeps
+the hidden advanced fields consistent on every form `change`:
+
+- `displayMode` = `single-` + the simple "Width" select, `selectedFile` = the one file
+- `unwrapped` checked
+- Filename set to `file.<ext>` (from upload name, else render mode/type) - but only when
+  it is empty or already matches `file` / `file.<ext>`, so a custom name is left alone
+
+The filename is kept filled continuously rather than on submit, because it is a hidden
+`required` field and browser validation runs before the `submit` event.
+
+Simple mode requires exactly one file (it adds one if there are none, and the button is
+disabled with more). New pastes start in simple mode; existing pastes do if they have at
+most one file and a `single-*` display mode. No server-side changes are involved.
+
+When adding a per-file field, mark its `.form-group` `advanced-only` in both
+`edit.html.twig` and `addFile()` unless it belongs in the simple view.
 
 ### templates/login.html.twig
 - **OIDC button**: "Login with {OIDC_NAME}" shown first when `oidcEnabled`

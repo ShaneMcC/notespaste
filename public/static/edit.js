@@ -9,7 +9,8 @@ let editConfig = {
     csrfToken: '',
     pasteId: '',
     pasteTitle: '',
-    fileIndex: 0
+    fileIndex: 0,
+    initialMode: 'advanced'
 };
 
 // Cached highlight.js languages
@@ -118,7 +119,7 @@ function addFile() {
     const typeOptions = buildTypeSelectOptions('');
 
     fileEditor.innerHTML = `
-        <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
+        <div class="file-editor-header advanced-only" onclick="toggleFileEditor(event, this)">
             <div class="file-editor-header-left">
                 <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
                 <span class="collapse-icon">▼</span>
@@ -130,7 +131,7 @@ function addFile() {
 
         <div class="file-editor-body">
         <div class="inline-fields">
-            <div class="form-group">
+            <div class="form-group advanced-only">
                 <label>Filename</label>
                 <input type="text" name="files[${editConfig.fileIndex}][filename]" required oninput="updateDisplayFileDropdown()">
             </div>
@@ -156,31 +157,31 @@ function addFile() {
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <label for="files[${editConfig.fileIndex}][displayName]">Display Name (optional)</label>
             <input type="text" id="files[${editConfig.fileIndex}][displayName]" name="files[${editConfig.fileIndex}][displayName]" placeholder="Leave empty to use filename" oninput="updateDisplayFileDropdown()">
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <label>Description</label>
             <input type="text" name="files[${editConfig.fileIndex}][description]">
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <div class="checkbox-field">
                 <input type="checkbox" id="files[${editConfig.fileIndex}][hidden]" name="files[${editConfig.fileIndex}][hidden]" value="1">
                 <label for="files[${editConfig.fileIndex}][hidden]">Hidden (don't show in multi-file mode)</label>
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <div class="checkbox-field">
                 <input type="checkbox" id="files[${editConfig.fileIndex}][unwrapped]" name="files[${editConfig.fileIndex}][unwrapped]" value="1">
                 <label for="files[${editConfig.fileIndex}][unwrapped]">Unwrapped (render without file header/wrapper)</label>
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <div class="checkbox-field">
                 <input type="checkbox" id="files[${editConfig.fileIndex}][collapsed]" name="files[${editConfig.fileIndex}][collapsed]" value="1">
                 <label for="files[${editConfig.fileIndex}][collapsed]">Start collapsed (multi-file mode)</label>
@@ -200,7 +201,7 @@ function addFile() {
             </div>
         </div>
 
-        <div class="form-group">
+        <div class="form-group advanced-only">
             <label for="files[${editConfig.fileIndex}][collapsedDescription]">Collapsed Description (optional)</label>
             <input type="text" id="files[${editConfig.fileIndex}][collapsedDescription]" name="files[${editConfig.fileIndex}][collapsedDescription]" placeholder="Brief description shown when collapsed">
         </div>
@@ -230,6 +231,7 @@ function addFile() {
     updateDisplayFileDropdown();
 
     editConfig.fileIndex++;
+    updateModeToggle();
 }
 
 function removeFile(button) {
@@ -237,6 +239,7 @@ function removeFile(button) {
 
     // Update display file dropdown to remove deleted file
     updateDisplayFileDropdown();
+    updateModeToggle();
 }
 
 function updateFileFields(renderSelect) {
@@ -822,6 +825,119 @@ function showAliasError(message) {
     }, 5000);
 }
 
+// Simple/advanced editor mode
+//
+// Simple mode is a view over the advanced form: it hides the advanced-only
+// fields and keeps the hidden ones in a consistent state (single-file display,
+// unwrapped, generic filename), so switching back and forth loses nothing.
+let editorMode = 'advanced';
+
+// Extensions for types whose hljs name doesn't make a good one
+const TYPE_EXTENSIONS = {
+    plaintext: 'txt', javascript: 'js', typescript: 'ts', python: 'py', ruby: 'rb',
+    perl: 'pl', rust: 'rs', kotlin: 'kt', csharp: 'cs', fsharp: 'fs', markdown: 'md',
+    bash: 'sh', shell: 'sh', powershell: 'ps1', dockerfile: 'dockerfile', makefile: 'mk',
+    haskell: 'hs', elixir: 'ex', erlang: 'erl', clojure: 'clj', objectivec: 'm',
+    x86asm: 'asm', protobuf: 'proto', properties: 'properties', nginx: 'conf',
+    apache: 'conf', diff: 'diff', latex: 'tex'
+};
+
+function getFileEditors() {
+    return document.querySelectorAll('#files-container .file-editor');
+}
+
+function extensionForType(type) {
+    if (!type) return 'txt';
+    if (TYPE_EXTENSIONS[type]) return TYPE_EXTENSIONS[type];
+    if (/^[a-z0-9]{1,5}$/.test(type)) return type;
+    const lang = typeof hljs !== 'undefined' ? hljs.getLanguage(type) : null;
+    const alias = lang && (lang.aliases || []).find(a => /^[a-z0-9]{1,4}$/.test(a));
+    return alias || (/^[a-z0-9]+$/.test(type) ? type : 'txt');
+}
+
+function simpleFileExtension(fileEditor) {
+    const upload = fileEditor.querySelector('input[type="file"]');
+    if (upload && upload.files.length > 0) {
+        const match = upload.files[0].name.match(/\.([A-Za-z0-9]+)$/);
+        return match ? match[1].toLowerCase() : 'bin';
+    }
+
+    const render = fileEditor.querySelector('.render-select').value;
+    const filenameInput = fileEditor.querySelector('input[name*="[filename]"]');
+    if (['image', 'file', 'file-link'].includes(render)) {
+        // Keep whatever extension the existing file already has
+        const match = filenameInput.value.match(/\.([A-Za-z0-9]+)$/);
+        return match ? match[1] : 'txt';
+    }
+    if (render === 'rendered') return 'md';
+    if (render === 'highlighted') return extensionForType(fileEditor.querySelector('.type-select').value);
+    return 'txt';
+}
+
+// Bring the underlying advanced fields in line with what simple mode shows
+function syncSimpleMode() {
+    if (editorMode !== 'simple') return;
+
+    const fileEditor = getFileEditors()[0];
+    if (!fileEditor) return;
+
+    // Only manage the filename if it's empty or one we generated - a name
+    // chosen in advanced mode is left alone
+    const filenameInput = fileEditor.querySelector('input[name*="[filename]"]');
+    if (filenameInput.value === '' || /^file(\.[A-Za-z0-9]+)?$/.test(filenameInput.value)) {
+        filenameInput.value = 'file.' + simpleFileExtension(fileEditor);
+    }
+
+    fileEditor.querySelector('input[name*="[unwrapped]"]').checked = true;
+
+    const width = document.getElementById('simpleWidth').value;
+    document.getElementById('displayMode').value = 'single-' + width;
+    updateDisplayModeFields();
+
+    updateDisplayFileDropdown();
+    document.getElementById('selectedFile').value = filenameInput.value;
+}
+
+function updateModeToggle() {
+    const simpleButton = document.getElementById('mode-simple');
+    const advancedButton = document.getElementById('mode-advanced');
+    const tooManyFiles = getFileEditors().length > 1;
+
+    simpleButton.className = editorMode === 'simple' ? '' : 'secondary';
+    advancedButton.className = editorMode === 'advanced' ? '' : 'secondary';
+    simpleButton.disabled = tooManyFiles && editorMode !== 'simple';
+    simpleButton.title = simpleButton.disabled ? 'Simple mode only supports a single file' : '';
+}
+
+function setEditorMode(mode) {
+    if (mode === 'simple' && getFileEditors().length > 1) return;
+
+    editorMode = mode;
+    const form = document.getElementById('paste-form');
+    form.classList.toggle('simple-mode', mode === 'simple');
+
+    if (mode === 'simple') {
+        if (getFileEditors().length === 0) {
+            addFile();
+        }
+
+        const fileEditor = getFileEditors()[0];
+        if (fileEditor.classList.contains('collapsed')) {
+            toggleFileEditor(null, fileEditor.querySelector('.file-editor-header'));
+        }
+
+        const displayMode = document.getElementById('displayMode').value;
+        document.getElementById('simpleWidth').value = displayMode.endsWith('-wide') ? 'wide' : 'normal';
+        syncSimpleMode();
+    }
+
+    getFileEditors().forEach(editor => {
+        editor.setAttribute('draggable', mode === 'simple' ? 'false' : 'true');
+    });
+
+    updateModeToggle();
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Populate all existing type selects with dynamic highlight.js languages
@@ -836,4 +952,8 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.file-editor').forEach(function(fileEditor) {
         setupDragAndDrop(fileEditor);
     });
+
+    // Any change to the file (render mode, type, upload) can change its name
+    document.getElementById('paste-form').addEventListener('change', syncSimpleMode);
+    setEditorMode(editConfig.initialMode);
 });

@@ -798,3 +798,49 @@ button.danger, .button.danger {
 button.danger:hover, .button.danger:hover {
     background: #c82333;
 }
+
+/* Simple/advanced editor mode */
+.mode-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-toggle button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.simple-only {
+    display: none;
+}
+
+.simple-mode .simple-only {
+    display: block;
+}
+
+.simple-mode .advanced-only {
+    display: none;
+}
+
+.simple-mode .inline-fields {
+    grid-template-columns: 1fr 1fr;
+}
+
+.simple-mode .file-editor {
+    border: none;
+    padding: 0;
+    background: none;
+}
+
+/* Collapsible "more details" section */
+.more-details {
+    margin-bottom: 20px;
+}
+
+.more-details summary {
+    cursor: pointer;
+    font-weight: bold;
+    color: var(--text-secondary);
+    margin-bottom: 15px;
+}

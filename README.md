@@ -209,6 +209,19 @@ These values take priority over the equivalent environment variables.
 - **Aliases** - Create multiple URLs for the same paste
 - **Delete** - Remove pastes you no longer need
 
+### Simple and Advanced Editing
+
+The paste editor opens in **Simple** mode for new pastes (and for existing
+single-file pastes). Simple mode is for quick one-file pastes: you pick a
+width, render mode and type, then paste content or upload a file. The file is
+named `file.<ext>` automatically based on the type or upload, and is always
+shown unwrapped in single-file display mode.
+
+**Advanced** mode shows every option: multiple files, display names,
+descriptions, hidden/collapsed files and so on. Simple mode is just a view
+over the advanced form, so you can switch between them without losing
+anything. Simple mode is unavailable once a paste has more than one file.
+
 ## Display Modes
 
 Pastes can be displayed in different layouts:

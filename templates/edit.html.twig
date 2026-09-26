@@ -17,6 +17,11 @@
     </div>
 </header>
 
+<div class="mode-toggle">
+    <button type="button" id="mode-simple" class="secondary" onclick="setEditorMode('simple')">Simple</button>
+    <button type="button" id="mode-advanced" class="secondary" onclick="setEditorMode('advanced')">Advanced</button>
+</div>
+
 <form method="post" enctype="multipart/form-data" id="paste-form">
     <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
     {% if isNew %}
@@ -37,20 +42,24 @@
         <input type="text" id="title" name="title" value="{{ meta.title }}" required>
     </div>
 
-    <div class="form-group">
-        <label for="summary">Summary (shown in paste list)</label>
-        <input type="text" id="summary" name="summary" value="{{ meta.summary }}">
-    </div>
+    <details class="more-details"{% if meta.summary or meta.description %} open{% endif %}>
+        <summary>More details (summary, description, author)</summary>
 
-    <div class="form-group">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" rows="3">{{ meta.description }}</textarea>
-    </div>
+        <div class="form-group">
+            <label for="summary">Summary (shown in paste list)</label>
+            <input type="text" id="summary" name="summary" value="{{ meta.summary }}">
+        </div>
 
-    <div class="form-group">
-        <label for="author">Author</label>
-        <input type="text" id="author" name="author" value="{{ meta.author }}">
-    </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <textarea id="description" name="description" rows="3">{{ meta.description }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="author">Author</label>
+            <input type="text" id="author" name="author" value="{{ meta.author }}">
+        </div>
+    </details>
 
     <div class="form-group">
         <div class="checkbox-field">
@@ -101,7 +110,15 @@
     </div>
     {% endif %}
 
-    <div class="form-group">
+    <div class="form-group simple-only">
+        <label for="simpleWidth">Width</label>
+        <select id="simpleWidth">
+            <option value="normal">Normal</option>
+            <option value="wide">Wide</option>
+        </select>
+    </div>
+
+    <div class="form-group advanced-only">
         <label for="displayMode">Display Mode</label>
         <select id="displayMode" name="displayMode" onchange="updateDisplayModeFields()">
             <option value="multi-normal" {% if meta.displayMode == 'multi-normal' or not meta.displayMode %}selected{% endif %}>Multi File: Normal</option>
@@ -111,7 +128,7 @@
         </select>
     </div>
 
-    <div class="form-group hidden" id="selectedFileGroup">
+    <div class="form-group hidden advanced-only" id="selectedFileGroup">
         <label for="selectedFile">Display File</label>
         <select id="selectedFile" name="selectedFile">
             {% if meta.files %}
@@ -124,13 +141,13 @@
         </select>
     </div>
 
-    <h2>Files</h2>
+    <h2 class="advanced-only">Files</h2>
 
     <div id="files-container">
         {% if meta.files %}
             {% for filename, fileMeta in meta.files %}
             <div class="file-editor{% if meta.files|length > 1 %} collapsed{% endif %}" data-file-index="{{ loop.index0 }}" draggable="true" ondragstart="handleDragStart(event)" ondragover="handleDragOver(event)" ondrop="handleDrop(event)" ondragend="handleDragEnd(event)">
-                <div class="file-editor-header" onclick="toggleFileEditor(event, this)">
+                <div class="file-editor-header advanced-only" onclick="toggleFileEditor(event, this)">
                     <div class="file-editor-header-left">
                         <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
                         <span class="collapse-icon">{% if meta.files|length > 1 %}►︎{% else %}▼{% endif %}</span>
@@ -143,7 +160,7 @@
                 <div class="file-editor-body">
                 <input type="hidden" name="files[{{ loop.index0 }}][originalFilename]" value="{{ filename }}">
                 <div class="inline-fields">
-                    <div class="form-group">
+                    <div class="form-group advanced-only">
                         <label>Filename</label>
                         <input type="text" name="files[{{ loop.index0 }}][filename]" value="{{ filename }}" required oninput="updateDisplayFileDropdown()">
                     </div>
@@ -170,31 +187,31 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <label for="files[{{ loop.index0 }}][displayName]">Display Name (optional)</label>
                     <input type="text" id="files[{{ loop.index0 }}][displayName]" name="files[{{ loop.index0 }}][displayName]" value="{{ fileMeta.displayName }}" placeholder="Leave empty to use filename" oninput="updateDisplayFileDropdown()">
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <label>Description</label>
                     <input type="text" name="files[{{ loop.index0 }}][description]" value="{{ fileMeta.description }}">
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <div class="checkbox-field">
                         <input type="checkbox" id="files[{{ loop.index0 }}][hidden]" name="files[{{ loop.index0 }}][hidden]" value="1" {% if fileMeta.hidden %}checked{% endif %}>
                         <label for="files[{{ loop.index0 }}][hidden]">Hidden (don't show in multi-file mode)</label>
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <div class="checkbox-field">
                         <input type="checkbox" id="files[{{ loop.index0 }}][unwrapped]" name="files[{{ loop.index0 }}][unwrapped]" value="1" {% if fileMeta.unwrapped %}checked{% endif %}>
                         <label for="files[{{ loop.index0 }}][unwrapped]">Unwrapped (render without file header/wrapper)</label>
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <div class="checkbox-field">
                         <input type="checkbox" id="files[{{ loop.index0 }}][collapsed]" name="files[{{ loop.index0 }}][collapsed]" value="1" {% if fileMeta.collapsed %}checked{% endif %}>
                         <label for="files[{{ loop.index0 }}][collapsed]">Start collapsed (multi-file mode)</label>
@@ -214,7 +231,7 @@
                     </div>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group advanced-only">
                     <label for="files[{{ loop.index0 }}][collapsedDescription]">Collapsed Description (optional)</label>
                     <input type="text" id="files[{{ loop.index0 }}][collapsedDescription]" name="files[{{ loop.index0 }}][collapsedDescription]" value="{{ fileMeta.collapsedDescription }}" placeholder="Brief description shown when collapsed">
                 </div>
@@ -247,7 +264,7 @@
         {% endif %}
     </div>
 
-    <button type="button" onclick="addFile()" class="secondary">Add File</button>
+    <button type="button" onclick="addFile()" class="secondary advanced-only">Add File</button>
 
     <div class="button-group">
         <button type="submit">Save Paste</button>
@@ -267,7 +284,8 @@ initEditConfig({
     csrfToken: '{{ csrfToken }}',
     pasteId: '{{ paste.id|default("") }}',
     pasteTitle: '{{ meta.title|e("js") }}',
-    fileIndex: {{ meta.files|length }}
+    fileIndex: {{ meta.files|length }},
+    initialMode: '{{ isNew or (meta.files|length <= 1 and meta.displayMode|default('') starts with 'single-') ? 'simple' : 'advanced' }}'
 });
 </script>
 {% endblock %}
