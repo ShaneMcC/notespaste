@@ -91,6 +91,7 @@ function processFileData(int $index, array $fileData): array {
         'collapsedDescription' => $fileData['collapsedDescription'] ?? '',
         'lineNumbers' => isset($fileData['lineNumbers']) && $fileData['lineNumbers'] === '1',
         'lineNumberStart' => (int)($fileData['lineNumberStart'] ?? 1) ?: 1,
+        'sourceLink' => isset($fileData['sourceLink']) && $fileData['sourceLink'] === '1',
     ];
 
     return [

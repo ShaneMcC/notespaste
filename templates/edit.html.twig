@@ -231,6 +231,13 @@
                     </div>
                 </div>
 
+                <div class="form-group file-source-link-field">
+                    <div class="checkbox-field">
+                        <input type="checkbox" id="files[{{ loop.index0 }}][sourceLink]" name="files[{{ loop.index0 }}][sourceLink]" value="1" {% if fileMeta.sourceLink %}checked{% endif %}>
+                        <label for="files[{{ loop.index0 }}][sourceLink]">Show source link (when unwrapped or in single-file mode)</label>
+                    </div>
+                </div>
+
                 <div class="form-group advanced-only">
                     <label for="files[{{ loop.index0 }}][collapsedDescription]">Collapsed Description (optional)</label>
                     <input type="text" id="files[{{ loop.index0 }}][collapsedDescription]" name="files[{{ loop.index0 }}][collapsedDescription]" value="{{ fileMeta.collapsedDescription }}" placeholder="Brief description shown when collapsed">

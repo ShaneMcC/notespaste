@@ -247,6 +247,7 @@ Each file in a paste can be configured with these options:
 - **Unwrapped** - Render without file header/wrapper (cleaner display)
 - **Collapsed** - Start collapsed in multi-file mode (click header to expand)
 - **Collapsed Description** - Brief text shown when file is collapsed
+- **Show source link** - Add a "View <filename>" link above an unwrapped file (including single-file mode), which otherwise has no header to link from
 
 ### Render Modes
 - **Plain** - Raw text in `<pre>` block

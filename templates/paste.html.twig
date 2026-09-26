@@ -39,6 +39,12 @@
         </div>
         {% endif %}
 
+        {% if file.meta.sourceLink and file.meta.render not in ['image', 'file', 'file-link'] %}
+        <div class="source-link">
+            <a href="./files/{{ file.filename|url_encode }}">View {{ file.filename }}</a>
+        </div>
+        {% endif %}
+
         {{ file.renderedContent|raw }}
     {% else %}
         {# Wrapped file: show full file section with header #}

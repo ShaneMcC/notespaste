@@ -224,7 +224,8 @@ notes/alias-to-paste/           # Alias directory (contains only _alias.json)
       "collapsed": true,
       "collapsedDescription": "PHP utility script",
       "lineNumbers": true,
-      "lineNumberStart": 1
+      "lineNumberStart": 1,
+      "sourceLink": false
     }
   }
 }
@@ -385,7 +386,8 @@ Each file in `_meta.json` has additional metadata beyond filename and render mod
     "collapsed": true,                      // Start collapsed (multi-file)
     "collapsedDescription": "Click to expand", // Shown when collapsed
     "lineNumbers": true,                    // Show line numbers (highlighted mode only)
-    "lineNumberStart": 1                    // Starting line number
+    "lineNumberStart": 1,                   // Starting line number
+    "sourceLink": false                     // "View <filename>" link above unwrapped files
   }
 }
 ```
@@ -399,6 +401,7 @@ Each file in `_meta.json` has additional metadata beyond filename and render mod
 - `description` - Explanatory text shown above file content
 - `lineNumbers: true` - Show line numbers in the gutter (only for `highlighted` render mode)
 - `lineNumberStart` - Start line numbering from a specific number (default: 1)
+- `sourceLink: true` - Unwrapped files (and so every single-file-mode paste) have no header, so no "View" link to the raw file; this adds one above the content. Off by default, and ignored for `image`/`file`/`file-link` modes, which already link to the file
 
 ### 9. Configuration System
 

@@ -201,6 +201,13 @@ function addFile() {
             </div>
         </div>
 
+        <div class="form-group file-source-link-field">
+            <div class="checkbox-field">
+                <input type="checkbox" id="files[${editConfig.fileIndex}][sourceLink]" name="files[${editConfig.fileIndex}][sourceLink]" value="1">
+                <label for="files[${editConfig.fileIndex}][sourceLink]">Show source link (when unwrapped or in single-file mode)</label>
+            </div>
+        </div>
+
         <div class="form-group advanced-only">
             <label for="files[${editConfig.fileIndex}][collapsedDescription]">Collapsed Description (optional)</label>
             <input type="text" id="files[${editConfig.fileIndex}][collapsedDescription]" name="files[${editConfig.fileIndex}][collapsedDescription]" placeholder="Brief description shown when collapsed">
@@ -250,6 +257,7 @@ function updateFileFields(renderSelect) {
     const fileExistsIndicator = fileEditor.querySelector('.file-exists-indicator');
     const typeSelect = fileEditor.querySelector('.type-select');
     const lineNumbersField = fileEditor.querySelector('.file-line-numbers-field');
+    const sourceLinkField = fileEditor.querySelector('.file-source-link-field');
 
     // Hide type for image/file/file-link/link/rendered modes
     if (renderMode === 'image' || renderMode === 'file' || renderMode === 'file-link' || renderMode === 'link' || renderMode === 'rendered') {
@@ -308,6 +316,11 @@ function updateFileFields(renderSelect) {
         } else {
             lineNumbersField.classList.add('hidden');
         }
+    }
+
+    // Image and file modes already are a link to the file
+    if (sourceLinkField) {
+        sourceLinkField.classList.toggle('hidden', ['image', 'file', 'file-link'].includes(renderMode));
     }
 }
 

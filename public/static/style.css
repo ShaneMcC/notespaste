@@ -883,3 +883,10 @@ li input[type="checkbox"] {
 li:has(> input[type="checkbox"]) {
     list-style: none;
 }
+
+/* Optional link to an unwrapped file's source */
+.source-link {
+    text-align: right;
+    font-size: 0.9em;
+    margin-bottom: 10px;
+}
