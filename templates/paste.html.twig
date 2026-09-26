@@ -3,7 +3,7 @@
 {% block title %}{{ meta.title }} - Pastebin{% endblock %}
 
 {% block extra_styles %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous">
+<link rel="stylesheet" href="{{ basePath|default('../..') }}/static/highlight/styles/{{ highlightTheme }}.min.css?v={{ highlight.version }}">
 {% if displayMode ends with '-wide' %}
 <style>
 .container, .site-footer {
@@ -98,10 +98,25 @@
 {% endblock %}
 
 {% block extra_scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
+<script src="{{ basePath|default('../..') }}/static/highlight/highlight.min.js?v={{ highlight.version }}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.8.0/highlightjs-line-numbers.min.js" integrity="sha384-+ch8x/dgaV//v6Sa8m4v5+7KScnpCuxHqilN8njQ013CEKg3Fbd8Q3oN9tfpouLh" crossorigin="anonymous"></script>
 <script>
+    // Every language is bundled, but auto-detect only tries the common ones - across
+    // all of them it is slower and keeps guessing obscure languages for short snippets
+    hljs.configure({
+        languages: ['bash', 'c', 'cpp', 'csharp', 'css', 'diff', 'go', 'graphql', 'ini', 'java',
+            'javascript', 'json', 'kotlin', 'less', 'lua', 'makefile', 'markdown', 'objectivec',
+            'perl', 'php', 'php-template', 'plaintext', 'python', 'python-repl', 'r', 'ruby', 'rust',
+            'scss', 'shell', 'sql', 'swift', 'typescript', 'vbnet', 'wasm', 'xml', 'yaml',
+            'dockerfile', 'nginx', 'powershell'],
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
+        // Code blocks with no language (e.g. untagged markdown fences) still take the theme's colours
+        document.querySelectorAll('pre > code:not([class*="language-"])').forEach(function(block) {
+            block.classList.add('hljs');
+        });
+
         // Only highlight code blocks with language-* class
         document.querySelectorAll('pre code[class*="language-"]').forEach(function(block) {
             hljs.highlightElement(block);

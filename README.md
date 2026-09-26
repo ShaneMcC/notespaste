@@ -28,7 +28,7 @@ Feel free to raise issues for things and I may in time decide to get to it.
 - **File organization** - Drag-and-drop reordering, hide/collapse options
 - **Multiple render modes:**
   - Plain text
-  - Syntax-highlighted code (20+ languages via highlight.js)
+  - Syntax-highlighted code (190+ languages via a self-hosted highlight.js, with a configurable theme)
   - Rendered markdown
   - Images (with preview)
   - File downloads
@@ -84,6 +84,14 @@ outside Docker - via a local config file (see
 
 All four of `OIDC_ISSUER`, `OIDC_CLIENTID`, `OIDC_SECRET` and `OIDC_NAME` must be set,
 otherwise OIDC stays switched off.
+
+**Appearance (optional):**
+- `HIGHLIGHT_THEME` - Default highlight.js theme for code (default: `github-dark`). Any file in
+  `public/static/highlight/styles/` without the `.min.css`, e.g. `base16/dracula` (or
+  `base16-dracula`), `atom-one-dark` or `nord`. Existing pastes pick up a change after "Rerender All".
+- `HIGHLIGHT_THEMES` - Comma-separated themes offered in the paste editor's "Syntax Theme"
+  dropdown, which lets each paste override the default (default: a built-in shortlist of
+  dark themes, see `src/Highlight.php`)
 
 ### Authentication Methods
 

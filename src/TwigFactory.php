@@ -12,6 +12,11 @@ class TwigFactory
         if (self::$instance === null) {
             $loader = new \Twig\Loader\FilesystemLoader(self::$templatesDir);
             self::$instance = new \Twig\Environment($loader);
+            self::$instance->addGlobal('highlight', [
+                'version' => Highlight::VERSION,
+                'theme' => Highlight::getTheme(),
+                'themes' => Highlight::getThemes(),
+            ]);
         }
 
         // Always update basePath if provided (it may change between requests in testing)

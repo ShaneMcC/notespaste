@@ -4,6 +4,16 @@ $config = [
     'htpasswd_path' => getenv('HTPASSWD_PATH') ?: __DIR__ . '/.htpasswd',
     'notes_dir' => getenv('NOTES_DIR') ?: __DIR__ . '/../public/notes',
 
+    // highlight.js theme, as a path under public/static/highlight/styles/ without
+    // the extension, e.g. "github-dark" (the default) or "base16/dracula" (also
+    // accepted as "base16-dracula").
+    // Existing pastes only pick up a change once they are re-rendered.
+    'highlight_theme' => getenv('HIGHLIGHT_THEME') ?: '',
+
+    // Themes offered per paste in the edit form, comma-separated in the environment.
+    // Empty means the built-in list in src/Highlight.php.
+    'highlight_themes' => array_values(array_filter(array_map('trim', explode(',', getenv('HIGHLIGHT_THEMES') ?: '')))),
+
     // OpenID Connect login. Disabled unless issuer, client_id, client_secret and
     // name are all set. redirect_uri is optional - it is worked out from the
     // request when left empty.

@@ -128,6 +128,21 @@
         </select>
     </div>
 
+    <div class="form-group">
+        <label for="highlightTheme">Syntax Theme</label>
+        {% set pasteTheme = meta.highlightTheme|default('') %}
+        <select id="highlightTheme" name="highlightTheme">
+            <option value="">Site default ({{ highlight.themes[highlight.theme] }})</option>
+            {% for value, label in highlight.themes %}
+                <option value="{{ value }}" {% if pasteTheme == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+            {# Keep a theme that has since dropped off the list #}
+            {% if pasteTheme and pasteTheme not in highlight.themes|keys %}
+                <option value="{{ pasteTheme }}" selected>{{ pasteTheme }}</option>
+            {% endif %}
+        </select>
+    </div>
+
     <div class="form-group hidden advanced-only" id="selectedFileGroup">
         <label for="selectedFile">Display File</label>
         <select id="selectedFile" name="selectedFile">
@@ -282,7 +297,7 @@
     </div>
 </form>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" integrity="sha384-F/bZzf7p3Joyp5psL90p/p89AZJsndkSoGwRpXcZhleCWhd8SnRuoYo4d0yirjJp" crossorigin="anonymous"></script>
+<script src="{{ basePath }}/static/highlight/highlight.min.js?v={{ highlight.version }}"></script>
 <script src="https://cdn.jsdelivr.net/npm/@joaomoreno/unique-names-generator@5.2.0/dist/index.umd.js" integrity="sha384-aGx4wBvQT6SiLIGqTLqNARarTjnk0ALUqo+mc9EGfqCS0zJ2QY/o8awSjcc/1d1/" crossorigin="anonymous"></script>
 <script src="{{ basePath }}/static/edit.js"></script>
 <script>

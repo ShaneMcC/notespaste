@@ -139,7 +139,8 @@ chown -R www-data:www-data public/notes/
 │   ├── .htaccess          # Apache rewrite rules
 │   ├── static/            # CSS and JavaScript assets
 │   │   ├── style.css
-│   │   └── edit.js        # Edit page JavaScript
+│   │   ├── edit.js        # Edit page JavaScript
+│   │   └── highlight/     # Vendored highlight.js bundle + themes (see scripts/)
 │   └── notes/             # Paste storage
 │       └── {paste-id}/
 │           ├── _meta.json
@@ -149,6 +150,7 @@ chown -R www-data:www-data public/notes/
 │   ├── Auth.php
 │   ├── Csrf.php
 │   ├── Helpers.php
+│   ├── Highlight.php
 │   ├── Oidc.php
 │   ├── Paste.php
 │   ├── PasteRenderer.php
@@ -162,6 +164,8 @@ chown -R www-data:www-data public/notes/
 │   ├── login.html.twig
 │   └── rerender-results.html.twig
 ├── vendor/               # Composer dependencies
+├── scripts/
+│   └── update-highlight.sh  # Rebuilds public/static/highlight/ from cdnjs
 ├── composer.json
 ├── Dockerfile
 ├── .github/workflows/    # CI/CD pipeline
@@ -200,6 +204,7 @@ notes/alias-to-paste/           # Alias directory (contains only _alias.json)
   "public": true,
   "displayMode": "multi-normal",
   "selectedFile": "example.md",
+  "highlightTheme": "base16/dracula",
   "createdAt": "2025-01-15T10:30:00+00:00",
   "updatedAt": "2025-01-15T14:20:00+00:00",
   "aliases": ["my-short-url", "another-alias"],
@@ -413,6 +418,8 @@ Configuration is loaded from `config/config.php` which reads environment variabl
 return [
     'htpasswd_path' => getenv('HTPASSWD_PATH') ?: __DIR__ . '/.htpasswd',
     'notes_dir' => getenv('NOTES_DIR') ?: __DIR__ . '/../public/notes',
+    'highlight_theme' => getenv('HIGHLIGHT_THEME') ?: '',
+    'highlight_themes' => /* HIGHLIGHT_THEMES, comma-separated */ [],
     'oidc' => [
         'issuer' => getenv('OIDC_ISSUER') ?: '',
         'client_id' => getenv('OIDC_CLIENTID') ?: '',
@@ -513,7 +520,36 @@ The application uses CSS custom properties for theming:
 - All colors defined as CSS variables in `public/static/style.css`
 - No hardcoded colors in styles
 - Automatic theme switching based on browser/OS preference
-- 20+ languages supported for syntax highlighting via highlight.js
+- Code blocks use a highlight.js theme, chosen with `HIGHLIGHT_THEME` (see below)
+
+### 12. Self-hosted highlight.js
+
+**Why:** The CDN builds only include ~36 common languages, and neither cdnjs nor jsDelivr
+publish an all-languages build with a stable hash.
+
+`public/static/highlight/` holds `highlight.min.js` (the core bundle with every other language
+file appended, ~1MB) and every theme under `styles/`. It is vendored, and rebuilt with:
+
+```bash
+scripts/update-highlight.sh 11.12.0   # or no argument to refetch the current version
+```
+
+The script downloads from cdnjs, checks every file against the SRI hash cdnjs publishes, and
+updates `Highlight::VERSION` in `src/Highlight.php`. It replaces the whole directory.
+
+- Templates reference the files with `?v={{ highlight.version }}`, and `.htaccess` serves
+  `static/highlight/` with a one-year immutable `Cache-Control`, so bumping the version is
+  what busts caches
+- `Highlight::init()` rejects a theme with no matching file, so a typo in `HIGHLIGHT_THEME`
+  fails loudly instead of rendering unstyled code. `base16-name` is accepted as `base16/name`
+- Each paste can override the theme: `highlightTheme` in `_meta.json`, empty meaning the site
+  default. The edit form offers `highlight_themes` (default: `Highlight::DEFAULT_THEMES`), but
+  saving accepts any existing theme, and rendering falls back to the default if the file is gone
+- `highlight_themes` defaults to an empty list rather than the real one because
+  `config.local.php` merges with `array_replace_recursive()`, which merges lists by index
+- `paste.html.twig` limits auto-detection (Type left as "Auto-detect") to the common languages
+  via `hljs.configure({ languages })`; across all of them it is slower and misdetects short snippets
+- The line numbers plugin is still loaded from cdnjs with SRI
 
 ## Common Development Tasks
 
@@ -825,7 +861,6 @@ Potential features to add:
 2. **Search** - Full-text search across paste content
 3. **Pagination** - Limit homepage to 20 pastes, add pagination
 4. **Paste cloning** - "Fork" existing paste to create new version
-5. **Syntax themes** - Multiple highlight.js themes
 6. **Export** - Download paste as .zip archive
 7. **API** - JSON API for programmatic access
 8. **Webhooks** - Notify external services on paste create/update
@@ -985,6 +1020,14 @@ settings are present.
 - **Image mode**: Creates `<img>` tag with relative path
 - **File mode**: Creates download link
 - **Link mode**: Converts lines to `<a>` tags
+
+### src/Highlight.php
+- **VERSION**: The vendored highlight.js version, kept in step by `scripts/update-highlight.sh`
+- **init()**: Sets the site default theme and the per-paste choices, throwing if any has no matching `.min.css`
+- **getTheme()** / **getThemes()**: The default and the offered `[theme => label]` list, exposed to templates (with the version) as the `highlight` global by `TwigFactory`
+- **resolve()**: The theme a paste renders with - its own if still valid, otherwise the default
+- **sanitize()**: Cleans a submitted per-paste theme to a valid one or `''`
+- **normalize()**: Maps `base16-name` to `base16/name`
 
 ### src/Helpers.php
 - **sanitizeFilename()**: Prevents directory traversal attacks

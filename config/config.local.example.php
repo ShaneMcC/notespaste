@@ -19,6 +19,8 @@
 return [
     // 'htpasswd_path' => __DIR__ . '/.htpasswd',
     // 'notes_dir' => __DIR__ . '/../public/notes',
+    // 'highlight_theme' => 'base16/dracula',
+    // 'highlight_themes' => ['github-dark', 'base16/dracula', 'monokai'],
 
     // 'oidc' => [
     //     'issuer' => 'https://auth.example.com',

@@ -71,6 +71,7 @@ class PasteRenderer
             'meta' => $meta,
             'files' => $renderedFiles,
             'displayMode' => $displayMode,
+            'highlightTheme' => Highlight::resolve($meta['highlightTheme'] ?? ''),
             'isLoggedIn' => Auth::isLoggedIn(),
         ]);
     }

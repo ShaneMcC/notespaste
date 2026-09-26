@@ -12,12 +12,16 @@ use App\Csrf;
 use App\TwigFactory;
 use App\RenderMode;
 use App\Oidc;
+use App\Highlight;
 
 // Initialize authentication
 Auth::init($config['htpasswd_path']);
 
 // Initialize OIDC (stays disabled unless fully configured)
 Oidc::init($config['oidc']);
+
+// Initialize the syntax highlighting theme
+Highlight::init($config['highlight_theme'], $config['highlight_themes']);
 
 // Initialize Paste with notes directory
 Paste::setNotesDir($config['notes_dir']);
@@ -223,6 +227,7 @@ $router->post('/notes/new', function() {
             'public' => isset($_POST['public']) && $_POST['public'] === '1',
             'displayMode' => $_POST['displayMode'] ?? 'multi-normal',
             'selectedFile' => $_POST['selectedFile'] ?? '',
+            'highlightTheme' => Highlight::sanitize($_POST['highlightTheme'] ?? ''),
         ];
 
         $paste = Paste::create($data);
@@ -341,6 +346,7 @@ $router->post('/notes/([a-zA-Z0-9_-]+)/edit', function($id) {
             'public' => isset($_POST['public']) && $_POST['public'] === '1',
             'displayMode' => $_POST['displayMode'] ?? 'multi-normal',
             'selectedFile' => $_POST['selectedFile'] ?? '',
+            'highlightTheme' => Highlight::sanitize($_POST['highlightTheme'] ?? ''),
         ];
 
         $paste->update($data);

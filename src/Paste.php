@@ -192,6 +192,7 @@ class Paste
             'public' => $data['public'] ?? false,
             'displayMode' => $data['displayMode'] ?? 'multi-normal',
             'selectedFile' => $data['selectedFile'] ?? '',
+            'highlightTheme' => $data['highlightTheme'] ?? '',
             'createdAt' => date('c'),
             'updatedAt' => date('c'),
             'aliases' => [],
@@ -266,6 +267,7 @@ class Paste
         $this->meta['public'] = $data['public'] ?? $this->meta['public'] ?? false;
         $this->meta['displayMode'] = $data['displayMode'] ?? $this->meta['displayMode'] ?? 'multi-normal';
         $this->meta['selectedFile'] = $data['selectedFile'] ?? $this->meta['selectedFile'] ?? '';
+        $this->meta['highlightTheme'] = $data['highlightTheme'] ?? $this->meta['highlightTheme'] ?? '';
         $this->meta['updatedAt'] = date('c');
 
         $this->saveMeta();
