@@ -954,7 +954,9 @@ function setEditorMode(mode) {
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Populate all existing type selects with dynamic highlight.js languages
-    document.querySelectorAll('.type-select').forEach(populateTypeSelect);
+    document.querySelectorAll('.type-select').forEach(function(select) {
+        populateTypeSelect(select);
+    });
 
     document.querySelectorAll('.render-select').forEach(function(select) {
         updateFileFields(select);
