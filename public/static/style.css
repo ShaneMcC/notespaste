@@ -844,3 +844,42 @@ button.danger:hover, .button.danger:hover {
     color: var(--text-secondary);
     margin-bottom: 15px;
 }
+
+/* Tables (rendered markdown) */
+table {
+    border-collapse: collapse;
+    margin: 15px 0;
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+th, td {
+    border: 1px solid var(--border-secondary);
+    padding: 6px 12px;
+    vertical-align: top;
+}
+
+/* Only default the alignment - column alignment from markdown comes as an align attribute */
+th:not([align]) {
+    text-align: left;
+}
+
+th {
+    background: var(--bg-quaternary);
+    font-weight: bold;
+}
+
+tr:nth-child(even) td {
+    background: var(--bg-tertiary);
+}
+
+/* Task list checkboxes shouldn't take the full-width form input styling */
+li input[type="checkbox"] {
+    width: auto;
+    margin: 0 6px 0 0;
+}
+
+li:has(> input[type="checkbox"]) {
+    list-style: none;
+}

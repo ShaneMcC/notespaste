@@ -3,7 +3,11 @@
 namespace App;
 
 use League\CommonMark\Environment\Environment;
+use League\CommonMark\Extension\Autolink\AutolinkExtension;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\Strikethrough\StrikethroughExtension;
+use League\CommonMark\Extension\Table\TableExtension;
+use League\CommonMark\Extension\TaskList\TaskListExtension;
 use League\CommonMark\MarkdownConverter;
 
 class PasteRenderer
@@ -134,6 +138,12 @@ class PasteRenderer
     {
         $environment = new Environment([]);
         $environment->addExtension(new CommonMarkCoreExtension());
+        // GitHub-flavoured extras, minus DisallowedRawHtmlExtension - raw HTML
+        // in markdown is allowed by design (see CLAUDE.md security notes)
+        $environment->addExtension(new AutolinkExtension());
+        $environment->addExtension(new StrikethroughExtension());
+        $environment->addExtension(new TableExtension());
+        $environment->addExtension(new TaskListExtension());
 
         $converter = new MarkdownConverter($environment);
         return $converter->convert($content)->getContent();

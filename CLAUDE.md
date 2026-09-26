@@ -280,7 +280,7 @@ Each file in a paste has a `render` mode that determines how it's displayed:
 |------|---------|----------------|
 | `plain` | Raw text | Wrapped in `<pre>` tag |
 | `highlighted` | Syntax highlighting | `<pre><code class="language-{type}">` with highlight.js |
-| `rendered` | Markdown to HTML | League CommonMark parser |
+| `rendered` | Markdown to HTML | League CommonMark parser (plus GFM tables, strikethrough, autolinks, task lists) |
 | `image` | Display image | `<img src="./files/{filename}">` |
 | `file` | Download link | `<a href="./files/{filename}" download>` |
 | `file-link` | View file link | `<a href="./files/{filename}" target="_blank">` (no download attribute) |
@@ -977,7 +977,7 @@ settings are present.
 - **renderFile()**: Handles individual file rendering by mode
 - **Plain mode**: Wraps in `<pre>` tag
 - **Highlighted mode**: Adds highlight.js classes
-- **Rendered mode**: Uses League CommonMark for markdown
+- **Rendered mode**: Uses League CommonMark with the GFM table, strikethrough, autolink and task list extensions (raw HTML deliberately not filtered)
 - **Image mode**: Creates `<img>` tag with relative path
 - **File mode**: Creates download link
 - **Link mode**: Converts lines to `<a>` tags
