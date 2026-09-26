@@ -138,6 +138,59 @@ function populateTypeSelect(selectElement, selectedValue = '') {
     selectElement.innerHTML = buildTypeSelectOptions(currentValue);
 }
 
+/**
+ * Add a filter box next to a type select's label - there are ~190 languages.
+ *
+ * Non-matching options are hidden rather than removed, so setting the select's
+ * value from code (e.g. to 'markdown' for rendered mode) still works while filtered.
+ */
+function addTypeFilter(selectElement) {
+    const group = selectElement.closest('.file-type-field');
+    if (!group || group.querySelector('.type-filter')) return;
+
+    const label = group.querySelector('label');
+    const row = document.createElement('div');
+    row.className = 'type-label-row';
+    label.replaceWith(row);
+    row.appendChild(label);
+
+    const filter = document.createElement('input');
+    filter.type = 'search';
+    filter.className = 'type-filter';
+    filter.placeholder = 'Filter…';
+    filter.setAttribute('aria-label', 'Filter types');
+    row.appendChild(filter);
+
+    filter.addEventListener('keydown', function(e) {
+        // Enter would otherwise submit the whole paste
+        if (e.key === 'Enter') e.preventDefault();
+    });
+
+    filter.addEventListener('input', function() {
+        const term = filter.value.trim().toLowerCase();
+        let firstMatch = null;
+        let exactMatch = null;
+
+        for (const option of selectElement.options) {
+            const label = option.text.toLowerCase();
+            const matches = option.value === '' || term === '' || label.includes(term) || option.value.includes(term);
+            option.hidden = !matches;
+
+            if (matches && term !== '' && option.value !== '') {
+                firstMatch = firstMatch || option;
+                if (option.value === term || label === term) exactMatch = exactMatch || option;
+            }
+        }
+
+        // Jump to the best match, so typing a name is enough to pick it
+        const pick = exactMatch || firstMatch;
+        if (pick && pick !== selectElement.selectedOptions[0]) {
+            selectElement.value = pick.value;
+            selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+}
+
 // File Management
 function addFile() {
     const container = document.getElementById('files-container');
@@ -261,6 +314,8 @@ function addFile() {
     `;
 
     container.appendChild(fileEditor);
+
+    addTypeFilter(fileEditor.querySelector('.type-select'));
 
     // Initialize field visibility for new file
     const renderSelect = fileEditor.querySelector('.render-select');
@@ -991,6 +1046,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Populate all existing type selects with dynamic highlight.js languages
     document.querySelectorAll('.type-select').forEach(function(select) {
         populateTypeSelect(select);
+        addTypeFilter(select);
     });
 
     document.querySelectorAll('.render-select').forEach(function(select) {

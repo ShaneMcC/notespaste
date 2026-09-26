@@ -344,6 +344,26 @@ pre code.hljs {
     padding-left: 10px !important;
 }
 
+/* Type select with its filter box on the label row */
+.type-label-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 3px;
+}
+
+.type-label-row label {
+    margin: 0;
+}
+
+input.type-filter {
+    width: 110px;
+    padding: 0 6px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 /* Line numbers form row */
 .line-numbers-row {
     display: flex;

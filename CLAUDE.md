@@ -1125,7 +1125,7 @@ When adding a per-file field, mark its `.form-group` `advanced-only` in both
 - **File uploads**: Handle file selection and drag-drop uploads
 - **Alias management**: Add, remove, and promote aliases
 - **Dynamic form generation**: Create file entry HTML from templates
-- **Language type selector**: Populated from `hljs.listLanguages()`
+- **Language type selector**: Populated from `hljs.listLanguages()`, with a filter box on its label row (`addTypeFilter()`) that hides non-matching options and selects the best match
 
 ## Performance Considerations
 
