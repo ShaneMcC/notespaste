@@ -19,7 +19,7 @@
         <h1>{% if not meta.public %}🔒 {% endif %}{{ meta.title }}</h1>
     </div>
     <div class="nav">
-        <a href="{{ basePath|default('../..') }}/" class="button">Home</a>
+        <a href="{{ basePath|default('../..') }}/" class="button secondary">Home</a>
         <a href="{{ basePath|default('../..') }}/notes/{{ paste.getId() }}/edit" class="button secondary">Edit</a>
     </div>
 </header>
@@ -56,8 +56,8 @@
                 </div>
                 <div class="file-meta">
                     {% if file.meta.type and file.meta.type not in ['image', 'file', 'file-link', 'link'] %}
-                        Type: {{ file.meta.type }}
-                        {% if file.meta.render not in ['file-link'] %} | {% endif %}
+                        {{ file.meta.type }}
+                        {% if file.meta.render not in ['file-link'] %} · {% endif %}
                     {% endif %}
                     {% if file.meta.render not in ['file-link'] %}
                         <a href="./files/{{ file.filename|url_encode }}" onclick="event.stopPropagation();">View</a>
@@ -88,11 +88,11 @@
 
 <footer>
     {% if meta.author %}
-        by {{ meta.author }} |
+        by {{ meta.author }} ·
     {% endif %}
-    Created: {{ meta.createdAt|date('Y-m-d H:i:s') }}
+    Created {{ meta.createdAt|date('Y-m-d H:i') }}
     {% if meta.updatedAt and meta.updatedAt != meta.createdAt %}
-        | Updated: {{ meta.updatedAt|date('Y-m-d H:i:s') }}
+        · Updated {{ meta.updatedAt|date('Y-m-d H:i') }}
     {% endif %}
 </footer>
 {% endblock %}

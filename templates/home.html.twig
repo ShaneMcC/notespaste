@@ -38,9 +38,9 @@
                 <div class="paste-meta">
                     by {{ pasteData.author }}
                     {% if pasteData.updatedAt %}
-                        | Updated {{ pasteData.updatedAt|date('Y-m-d H:i') }}
+                        · Updated {{ pasteData.updatedAt|date('Y-m-d H:i') }}
                     {% elseif pasteData.createdAt %}
-                        | Created {{ pasteData.createdAt|date('Y-m-d H:i') }}
+                        · Created {{ pasteData.createdAt|date('Y-m-d H:i') }}
                     {% endif %}
                 </div>
             </div>

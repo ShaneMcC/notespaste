@@ -7,6 +7,7 @@
     <h1>Login</h1>
 </header>
 
+<div class="narrow">
 {% if error %}
 <div class="error">
     {{ error }}
@@ -39,4 +40,5 @@
 {% elseif not oidcEnabled %}
 <p>No login methods are configured.</p>
 {% endif %}
+</div>
 {% endblock %}

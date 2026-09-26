@@ -6,11 +6,11 @@
 <header>
     <h1>{% if isNew %}New Paste{% else %}Edit Paste{% endif %}</h1>
     <div class="nav">
-        <a href="{{ basePath }}/" class="button">Home</a>
+        <a href="{{ basePath }}/" class="button secondary">Home</a>
         {% if not isNew %}
             <a href="{{ paste.getHtmlUrl() }}" class="button secondary">View</a>
         {% endif %}
-        <form method="post" action="{{ basePath }}/logout" style="display: inline;">
+        <form method="post" action="{{ basePath }}/logout" class="inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrfToken }}">
             <button type="submit" class="button secondary">Logout</button>
         </form>

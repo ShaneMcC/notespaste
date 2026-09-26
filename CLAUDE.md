@@ -661,7 +661,8 @@ All styles are in [static/style.css](static/style.css). No inline styles are use
 
 Common patterns:
 - `.button` - Primary button style (blue)
-- `.button.secondary` - Secondary button (gray)
+- `.button.secondary` - Secondary button (outlined)
+- `.button.danger` - Destructive action (red outline, fills on hover)
 - `.paste-*` - Paste-related components
 - `.form-group` - Form field wrapper
 - `.checkbox-field` - Checkbox with custom styling
